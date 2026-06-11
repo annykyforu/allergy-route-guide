@@ -1,3 +1,4 @@
+/// <reference types="google.maps" />
 // Loads Google Maps JS API once on the client.
 let promise: Promise<typeof google> | null = null;
 

@@ -1,3 +1,4 @@
+/// <reference types="google.maps" />
 import { useEffect, useRef, useState } from "react";
 import { loadGoogleMaps, type PollenLayer } from "@/lib/google-maps-loader";
 
@@ -16,7 +17,7 @@ interface PollenMapProps {
 }
 
 export function PollenMap({
-  center = { lat: 40.7128, lng: -74.006 },
+  center = { lat: 48.2082, lng: 16.3738 },
   zoom = 12,
   layer,
   onMapClick,
