@@ -1,0 +1,87 @@
+import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
+
+const GATEWAY_URL = "https://connector-gateway.lovable.dev/google_maps";
+
+function headers() {
+  const lovable = process.env.LOVABLE_API_KEY;
+  const gmaps = process.env.GOOGLE_MAPS_API_KEY;
+  if (!lovable || !gmaps) throw new Error("Missing Google Maps credentials");
+  return {
+    Authorization: `Bearer ${lovable}`,
+    "X-Connection-Api-Key": gmaps,
+    "Content-Type": "application/json",
+  };
+}
+
+export const getPollenForecast = createServerFn({ method: "POST" })
+  .inputValidator(
+    z.object({
+      lat: z.number().min(-90).max(90),
+      lng: z.number().min(-180).max(180),
+      days: z.number().min(1).max(5).default(5),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const url =
+      `${GATEWAY_URL}/pollen/v1/forecast:lookup` +
+      `?location.longitude=${data.lng}` +
+      `&location.latitude=${data.lat}` +
+      `&days=${data.days}` +
+      `&languageCode=en`;
+    const res = await fetch(url, { headers: headers() });
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`Pollen API ${res.status}: ${body.slice(0, 200)}`);
+    }
+    return (await res.json()) as PollenForecast;
+  });
+
+export interface PollenForecast {
+  regionCode?: string;
+  dailyInfo: Array<{
+    date: { year: number; month: number; day: number };
+    pollenTypeInfo: Array<{
+      code: string;
+      displayName?: string;
+      indexInfo?: {
+        value: number;
+        category: string;
+        indexDescription?: string;
+        color?: { red?: number; green?: number; blue?: number };
+      };
+      healthRecommendations?: string[];
+    }>;
+    plantInfo?: Array<{
+      code: string;
+      displayName?: string;
+      inSeason?: boolean;
+      indexInfo?: { value: number; category: string };
+    }>;
+  }>;
+}
+
+// Geocode an address to lat/lng
+export const geocodeAddress = createServerFn({ method: "POST" })
+  .inputValidator(z.object({ address: z.string().min(1).max(300) }))
+  .handler(async ({ data }) => {
+    const url = `${GATEWAY_URL}/maps/api/geocode/json?address=${encodeURIComponent(data.address)}`;
+    const res = await fetch(url, { headers: headers() });
+    if (!res.ok) throw new Error(`Geocode failed: ${res.status}`);
+    const json = (await res.json()) as {
+      results: Array<{
+        formatted_address: string;
+        geometry: { location: { lat: number; lng: number } };
+      }>;
+      status: string;
+    };
+    if (json.status !== "OK" || !json.results.length) {
+      throw new Error(`No results for "${data.address}"`);
+    }
+    const r = json.results[0];
+    return {
+      address: r.formatted_address,
+      lat: r.geometry.location.lat,
+      lng: r.geometry.location.lng,
+    };
+  });
