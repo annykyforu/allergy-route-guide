@@ -71,7 +71,7 @@ function SafeRouteScreen() {
   });
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex h-screen flex-col">
       <header className="px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-3">
         <h1 className="text-2xl font-bold tracking-tight text-foreground">
           Safe route finder
@@ -117,12 +117,12 @@ function SafeRouteScreen() {
         )}
       </div>
 
-      <div className="mt-4 mx-4 h-72 overflow-hidden rounded-2xl border border-border shadow-[var(--shadow-soft)]">
+      <div className="mt-4 mx-4 min-h-64 flex-1 overflow-hidden rounded-2xl border border-border shadow-[var(--shadow-soft)]">
         <PollenMap layer="NONE" polylines={polylines} />
       </div>
 
       {routes.length > 0 && (
-        <ul className="mt-4 space-y-2 px-4 pb-4">
+        <ul className="mt-4 max-h-[40vh] space-y-2 overflow-y-auto px-4 pb-4">
           {routes.map((r) => (
             <li
               key={r.index}
