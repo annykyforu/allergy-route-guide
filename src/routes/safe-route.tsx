@@ -117,7 +117,7 @@ function SafeRouteScreen() {
         )}
       </div>
 
-      <div className="mt-4 mx-4 min-h-64 flex-1 overflow-hidden rounded-2xl border border-border shadow-[var(--shadow-soft)]">
+      <div className="mt-4 mx-4 h-[50vh] overflow-hidden rounded-2xl border border-border shadow-[var(--shadow-soft)]">
         <PollenMap layer="NONE" polylines={polylines} />
       </div>
 
