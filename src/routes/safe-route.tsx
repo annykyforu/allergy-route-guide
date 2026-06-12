@@ -7,7 +7,7 @@ import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 import { findSafeRoutes, type SafeRoute } from "@/lib/safe-route.functions";
 import { geocodeAddress } from "@/lib/pollen.functions";
 import { pollenColor, pollenLabel } from "@/lib/google-maps-loader";
-import { Shield, AlertTriangle, Loader2 } from "lucide-react";
+import { Shield, AlertTriangle, Loader2, Footprints, Bike, Bus, Car } from "lucide-react";
 
 export const Route = createFileRoute("/safe-route")({
   head: () => ({
@@ -31,6 +31,9 @@ export const Route = createFileRoute("/safe-route")({
 function SafeRouteScreen() {
   const [origin, setOrigin] = useState("");
   const [destination, setDestination] = useState("");
+  const [travelMode, setTravelMode] = useState<
+    "WALK" | "BICYCLE" | "TRANSIT" | "DRIVE"
+  >("WALK");
   const [routes, setRoutes] = useState<SafeRoute[]>([]);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -50,7 +53,7 @@ function SafeRouteScreen() {
         data: {
           origin: { lat: a.lat, lng: a.lng },
           destination: { lat: b.lat, lng: b.lng },
-          travelMode: "WALK",
+          travelMode,
         },
       });
       setRoutes(result.routes);
@@ -95,6 +98,40 @@ function SafeRouteScreen() {
           placeholder="To (address or place)"
           className="w-full rounded-xl border border-border bg-card px-4 py-3 text-sm shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
         />
+        <div
+          role="radiogroup"
+          aria-label="Travel mode"
+          className="grid grid-cols-4 gap-2"
+        >
+          {(
+            [
+              { mode: "WALK", label: "Walk", Icon: Footprints },
+              { mode: "BICYCLE", label: "Bike", Icon: Bike },
+              { mode: "TRANSIT", label: "Transit", Icon: Bus },
+              { mode: "DRIVE", label: "Drive", Icon: Car },
+            ] as const
+          ).map(({ mode, label, Icon }) => {
+            const active = travelMode === mode;
+            return (
+              <button
+                key={mode}
+                type="button"
+                role="radio"
+                aria-checked={active}
+                onClick={() => setTravelMode(mode)}
+                className={
+                  "flex flex-col items-center justify-center gap-1 rounded-xl border px-2 py-2.5 text-xs font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-ring " +
+                  (active
+                    ? "border-primary bg-accent text-foreground"
+                    : "border-border bg-card text-muted-foreground hover:text-foreground")
+                }
+              >
+                <Icon className="h-4 w-4" />
+                {label}
+              </button>
+            );
+          })}
+        </div>
         <button
           disabled={
             !origin || !destination || mutation.isPending
