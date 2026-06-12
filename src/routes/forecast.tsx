@@ -6,6 +6,7 @@ import {
   getPollenForecast,
   geocodeAddress,
   reverseGeocode,
+  getIpLocation,
   type PollenForecast,
 } from "@/lib/pollen.functions";
 import { pollenColor, pollenLabel } from "@/lib/google-maps-loader";
@@ -40,9 +41,22 @@ function ForecastScreen() {
   const geocode = useServerFn(geocodeAddress);
   const forecast = useServerFn(getPollenForecast);
   const reverse = useServerFn(reverseGeocode);
+  const ipLocate = useServerFn(getIpLocation);
 
   useEffect(() => {
     if (loc || typeof navigator === "undefined" || !navigator.geolocation) return;
+    const fallback = async () => {
+      try {
+        const ip = await ipLocate();
+        if (ip) {
+          setLoc(ip);
+          return;
+        }
+      } catch {
+        /* fall through */
+      }
+      setLoc({ lat: 40.7128, lng: -74.006, label: "New York City" });
+    };
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         const lat = pos.coords.latitude;
@@ -56,8 +70,10 @@ function ForecastScreen() {
         }
         setLoc({ lat, lng, label });
       },
-      () => setLoc({ lat: 40.7128, lng: -74.006, label: "New York City" }),
-      { timeout: 4000 },
+      () => {
+        void fallback();
+      },
+      { timeout: 6000 },
     );
   }, [loc]);
 
