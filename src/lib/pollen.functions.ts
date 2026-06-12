@@ -89,3 +89,46 @@ export const geocodeAddress = createServerFn({ method: "POST" })
       lng: r.geometry.location.lng,
     };
   });
+
+// Reverse-geocode lat/lng to a short place name (locality if possible).
+export const reverseGeocode = createServerFn({ method: "POST" })
+  .inputValidator(
+    z.object({
+      lat: z.number().min(-90).max(90),
+      lng: z.number().min(-180).max(180),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const url = `${GATEWAY_URL}/maps/api/geocode/json?latlng=${data.lat},${data.lng}`;
+    const res = await fetch(url, { headers: headers() });
+    if (!res.ok) throw new Error(`Reverse geocode failed: ${res.status}`);
+    const json = (await res.json()) as {
+      results: Array<{
+        formatted_address: string;
+        address_components: Array<{
+          long_name: string;
+          short_name: string;
+          types: string[];
+        }>;
+      }>;
+      status: string;
+    };
+    if (json.status !== "OK" || !json.results.length) {
+      return { label: `${data.lat.toFixed(3)}, ${data.lng.toFixed(3)}` };
+    }
+    // Prefer locality + admin area for a friendly label.
+    const comps = json.results[0].address_components;
+    const pick = (type: string) =>
+      comps.find((c) => c.types.includes(type))?.long_name;
+    const locality =
+      pick("locality") ||
+      pick("postal_town") ||
+      pick("sublocality") ||
+      pick("administrative_area_level_2");
+    const region = pick("administrative_area_level_1") || pick("country");
+    const label =
+      locality && region
+        ? `${locality}, ${region}`
+        : locality || region || json.results[0].formatted_address;
+    return { label };
+  });
