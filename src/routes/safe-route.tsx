@@ -3,6 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { PollenMap } from "@/components/PollenMap";
+import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 import { findSafeRoutes, type SafeRoute } from "@/lib/safe-route.functions";
 import { geocodeAddress } from "@/lib/pollen.functions";
 import { pollenColor, pollenLabel } from "@/lib/google-maps-loader";
@@ -82,15 +83,15 @@ function SafeRouteScreen() {
       </header>
 
       <div className="px-4 space-y-2">
-        <input
+        <AddressAutocomplete
           value={origin}
-          onChange={(e) => setOrigin(e.target.value)}
+          onChange={setOrigin}
           placeholder="From (address or place)"
           className="w-full rounded-xl border border-border bg-card px-4 py-3 text-sm shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
         />
-        <input
+        <AddressAutocomplete
           value={destination}
-          onChange={(e) => setDestination(e.target.value)}
+          onChange={setDestination}
           placeholder="To (address or place)"
           className="w-full rounded-xl border border-border bg-card px-4 py-3 text-sm shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
         />
