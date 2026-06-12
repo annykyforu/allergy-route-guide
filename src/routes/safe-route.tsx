@@ -71,7 +71,7 @@ function SafeRouteScreen() {
   });
 
   return (
-    <div className="flex h-screen flex-col">
+    <div className="flex min-h-0 flex-1 flex-col">
       <header className="px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-3">
         <h1 className="text-2xl font-bold tracking-tight text-foreground">
           Safe route finder
