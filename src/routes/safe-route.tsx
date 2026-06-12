@@ -1,13 +1,20 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useMutation } from "@tanstack/react-query";
-import { useState } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
 import { PollenMap } from "@/components/PollenMap";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
-import { findSafeRoutes, type SafeRoute } from "@/lib/safe-route.functions";
+import { RouteExposureTimeline } from "@/components/RouteExposureTimeline";
+import {
+  findSafeRoutes,
+  getRouteExposureForecast,
+  type SafeRoute,
+  type PollenSample,
+} from "@/lib/safe-route.functions";
 import { geocodeAddress } from "@/lib/pollen.functions";
 import { pollenColor, pollenLabel } from "@/lib/google-maps-loader";
-import { Shield, AlertTriangle, Loader2, Footprints, Bike, Bus, Car } from "lucide-react";
+import { useAllergies } from "@/hooks/use-allergies";
+import { Shield, AlertTriangle, Loader2, Footprints, Bike, Bus, Car, Settings as SettingsIcon } from "lucide-react";
 
 export const Route = createFileRoute("/safe-route")({
   head: () => ({
@@ -37,9 +44,11 @@ function SafeRouteScreen() {
   const [routes, setRoutes] = useState<SafeRoute[]>([]);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { profile, categories, plants } = useAllergies();
 
   const geocode = useServerFn(geocodeAddress);
   const compute = useServerFn(findSafeRoutes);
+  const exposureFn = useServerFn(getRouteExposureForecast);
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -54,6 +63,7 @@ function SafeRouteScreen() {
           origin: { lat: a.lat, lng: a.lng },
           destination: { lat: b.lat, lng: b.lng },
           travelMode,
+          allergyProfile: profile,
         },
       });
       setRoutes(result.routes);
@@ -64,15 +74,87 @@ function SafeRouteScreen() {
     onError: (e: Error) => setError(e.message),
   });
 
-  const polylines = routes.map((r) => {
-    const isSelected = r.index === selectedIndex;
-    return {
+  const selectedRoute = useMemo(
+    () => routes.find((r) => r.index === selectedIndex) ?? null,
+    [routes, selectedIndex],
+  );
+
+  // Non-selected routes render as grey single-color polylines.
+  const polylines = routes
+    .filter((r) => r.index !== selectedIndex)
+    .map((r) => ({
       path: r.decodedPath,
-      color: isSelected ? (r.safest ? "#16A34A" : "#2563EB") : "#9CA3AF",
-      weight: isSelected ? 7 : 4,
-      opacity: isSelected ? 0.95 : 0.45,
-    };
+      color: "#9CA3AF",
+      weight: 4,
+      opacity: 0.45,
+    }));
+
+  // Selected route renders as segments colored by personalized pollen.
+  const segments = useMemo(() => {
+    if (!selectedRoute || selectedRoute.samples.length < 2) return [];
+    const samples = selectedRoute.samples;
+    return samples.slice(0, -1).map((s, i) => ({
+      from: { lat: s.lat, lng: s.lng },
+      to: { lat: samples[i + 1].lat, lng: samples[i + 1].lng },
+      color: pollenColor(Math.round((s.personalized + samples[i + 1].personalized) / 2)),
+      weight: 8,
+      opacity: 0.95,
+    }));
+  }, [selectedRoute]);
+
+  // Top hotspots on the selected route (up to 3, only meaningful values).
+  const hotspots = useMemo(() => {
+    if (!selectedRoute) return [];
+    return [...selectedRoute.samples]
+      .filter((s) => s.personalized >= 2)
+      .sort((a, b) => b.personalized - a.personalized)
+      .slice(0, 3)
+      .map((s) => ({
+        lat: s.lat,
+        lng: s.lng,
+        color: pollenColor(Math.round(s.personalized)),
+        title: `${pollenLabel(Math.round(s.personalized))} pollen here`,
+        breakdown: buildBreakdownHtml(s),
+      }));
+  }, [selectedRoute]);
+
+  // 5-day exposure forecast at the selected route's midpoint.
+  const midpoint = useMemo(() => {
+    if (!selectedRoute?.decodedPath.length) return null;
+    return selectedRoute.decodedPath[
+      Math.floor(selectedRoute.decodedPath.length / 2)
+    ];
+  }, [selectedRoute]);
+
+  const exposureQuery = useQuery({
+    queryKey: [
+      "exposure",
+      midpoint?.lat,
+      midpoint?.lng,
+      categories.join(","),
+      plants.join(","),
+    ],
+    queryFn: () =>
+      exposureFn({
+        data: {
+          lat: midpoint!.lat,
+          lng: midpoint!.lng,
+          allergyProfile: profile,
+        },
+      }),
+    enabled: !!midpoint,
+    staleTime: 1000 * 60 * 30,
   });
+
+  const profileEmpty = categories.length === 0 && plants.length === 0;
+  const profileLabel = plants.length
+    ? plants
+        .slice(0, 3)
+        .map((p) => p.charAt(0) + p.slice(1).toLowerCase().replace("_", " "))
+        .join(", ") + (plants.length > 3 ? ` +${plants.length - 3}` : "")
+    : categories
+        .map((c) => c.charAt(0) + c.slice(1).toLowerCase())
+        .join(", ");
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -81,8 +163,22 @@ function SafeRouteScreen() {
           Safe route finder
         </h1>
         <p className="text-sm text-muted-foreground">
-          We compare alternatives and highlight the one with the least pollen.
+          Color-coded by personalized pollen exposure.
         </p>
+        <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-xs">
+          <span className="text-muted-foreground">Scoring for:</span>
+          <span className="font-medium text-foreground">
+            {profileEmpty ? "All pollen (no profile set)" : profileLabel}
+          </span>
+          <Link
+            to="/settings"
+            className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
+            aria-label="Edit allergy profile"
+          >
+            <SettingsIcon className="h-3 w-3" />
+            Edit
+          </Link>
+        </div>
       </header>
 
       <div className="px-4 space-y-2">
@@ -156,8 +252,41 @@ function SafeRouteScreen() {
       </div>
 
       <div className="mt-4 mx-4 h-[50vh] overflow-hidden rounded-2xl border border-border shadow-[var(--shadow-soft)]">
-        <PollenMap layer="NONE" polylines={polylines} />
+        <PollenMap
+          layer="NONE"
+          polylines={polylines}
+          segments={segments}
+          hotspots={hotspots}
+        />
       </div>
+
+      {selectedRoute && (
+        <div className="mt-3 mx-4 flex items-center gap-3 rounded-xl border border-border bg-card p-2.5 text-[11px]">
+          <span className="font-semibold uppercase tracking-wide text-muted-foreground">
+            Exposure
+          </span>
+          <div className="flex flex-1 items-center gap-1">
+            {[0, 1, 2, 3, 4, 5].map((v) => (
+              <div key={v} className="flex flex-1 flex-col items-center gap-0.5">
+                <div
+                  className="h-2 w-full rounded-full"
+                  style={{ background: pollenColor(v) }}
+                />
+                <span className="text-[9px] text-muted-foreground">{v}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {selectedRoute && (
+        <div className="mt-3 mx-4">
+          <RouteExposureTimeline
+            days={exposureQuery.data?.days ?? []}
+            loading={exposureQuery.isPending}
+          />
+        </div>
+      )}
 
       {routes.length > 0 && (
         <ul className="mt-4 max-h-[40vh] space-y-2 overflow-y-auto px-4 pb-4">
@@ -209,15 +338,36 @@ function SafeRouteScreen() {
                   aria-hidden
                   className="h-3 w-3 rounded-full"
                   style={{
-                    background: pollenColor(Math.round(r.averagePollen)),
+                    background: pollenColor(Math.round(r.personalizedAvg)),
                   }}
                 />
                 <span className="text-xs text-foreground">
-                  Avg pollen{" "}
-                  <strong>{r.averagePollen.toFixed(1)}/5</strong> ·{" "}
-                  {pollenLabel(Math.round(r.averagePollen))} (peak{" "}
-                  {r.maxPollen}/5)
+                  Your risk{" "}
+                  <strong>{r.personalizedAvg.toFixed(1)}/5</strong> ·{" "}
+                  {pollenLabel(Math.round(r.personalizedAvg))} (peak{" "}
+                  {r.personalizedMax}/5)
+                  {r.worstPlant && (
+                    <>
+                      {" "}— mostly{" "}
+                      <strong className="text-foreground">{r.worstPlant}</strong>
+                    </>
+                  )}
                 </span>
+              </div>
+              {/* Mini segment bar showing exposure across the route */}
+              <div className="mt-2 flex h-2 w-full overflow-hidden rounded-full">
+                {r.samples.map((s, i) => (
+                  <div
+                    key={i}
+                    className="h-full flex-1"
+                    style={{ background: pollenColor(Math.round(s.personalized)) }}
+                    title={`${s.worstContributor ?? "Pollen"} ${s.personalized}/5`}
+                  />
+                ))}
+              </div>
+              <div className="mt-1 flex justify-between text-[10px] text-muted-foreground">
+                <span>start</span>
+                <span>end</span>
               </div>
             </li>
           ))}
@@ -225,4 +375,31 @@ function SafeRouteScreen() {
       )}
     </div>
   );
+}
+
+function buildBreakdownHtml(s: PollenSample): string {
+  const rows: string[] = [];
+  // Plants first, sorted by value desc, only meaningful values.
+  const plantRows = Object.entries(s.plantScores)
+    .filter(([, v]) => v.value > 0)
+    .sort((a, b) => b[1].value - a[1].value)
+    .slice(0, 5)
+    .map(
+      ([code, v]) =>
+        `<div>${prettify(code)}: <strong>${v.value}/5</strong>${v.inSeason ? " · in season" : ""}</div>`,
+    );
+  rows.push(...plantRows);
+  // Always show category fallback line.
+  rows.push(
+    `<div style="margin-top:4px;color:#777;">Tree ${s.categoryScores.TREE}/5 · Grass ${s.categoryScores.GRASS}/5 · Weed ${s.categoryScores.WEED}/5</div>`,
+  );
+  return rows.join("");
+}
+
+function prettify(code: string): string {
+  return code
+    .toLowerCase()
+    .split("_")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
 }

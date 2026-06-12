@@ -1,6 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Check, Leaf } from "lucide-react";
-import { ALLERGY_OPTIONS, useAllergies } from "@/hooks/use-allergies";
+import {
+  CATEGORY_OPTIONS,
+  PLANTS_BY_CATEGORY,
+  useAllergies,
+  type AllergyCategory,
+} from "@/hooks/use-allergies";
 
 export const Route = createFileRoute("/settings")({
   head: () => ({
@@ -21,7 +26,12 @@ export const Route = createFileRoute("/settings")({
 });
 
 function SettingsScreen() {
-  const { allergies, toggle } = useAllergies();
+  const {
+    categories,
+    plants,
+    toggleCategory,
+    togglePlant,
+  } = useAllergies();
 
   return (
     <div className="flex min-h-screen flex-col pb-24">
@@ -36,16 +46,16 @@ function SettingsScreen() {
 
       <section className="px-4">
         <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          My allergies
+          Categories
         </h2>
         <ul className="space-y-2">
-          {ALLERGY_OPTIONS.map(({ id, label, description }) => {
-            const active = allergies.includes(id);
+          {CATEGORY_OPTIONS.map(({ id, label, description }) => {
+            const active = categories.includes(id);
             return (
               <li key={id}>
                 <button
                   type="button"
-                  onClick={() => toggle(id)}
+                  onClick={() => toggleCategory(id)}
                   aria-pressed={active}
                   className={
                     "flex w-full items-start gap-3 rounded-2xl border p-4 text-left transition-colors " +
@@ -88,7 +98,50 @@ function SettingsScreen() {
             );
           })}
         </ul>
-        <p className="mt-3 text-xs text-muted-foreground">
+
+        <h2 className="mt-6 mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Specific plants
+        </h2>
+        <p className="mb-3 text-xs text-muted-foreground">
+          Pick the exact plants you react to. Route risk is computed against
+          these — e.g. a birch-only profile ignores high grass days.
+        </p>
+        <div className="space-y-4">
+          {(Object.keys(PLANTS_BY_CATEGORY) as AllergyCategory[]).map((cat) => {
+            const catLabel = CATEGORY_OPTIONS.find((c) => c.id === cat)?.label ?? cat;
+            return (
+              <div key={cat}>
+                <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  {catLabel}
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {PLANTS_BY_CATEGORY[cat].map(({ code, label }) => {
+                    const active = plants.includes(code);
+                    return (
+                      <button
+                        key={code}
+                        type="button"
+                        onClick={() => togglePlant(code)}
+                        aria-pressed={active}
+                        className={
+                          "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors " +
+                          (active
+                            ? "border-primary bg-accent text-foreground"
+                            : "border-border bg-card text-muted-foreground hover:text-foreground")
+                        }
+                      >
+                        {active && <Check className="h-3 w-3" />}
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <p className="mt-4 text-xs text-muted-foreground">
           Your selection is saved on this device.
         </p>
       </section>
