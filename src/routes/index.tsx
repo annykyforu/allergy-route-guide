@@ -122,7 +122,7 @@ function MapScreen() {
       </div>
 
       {/* Legend */}
-      <div className="absolute left-3 right-3 bottom-3 z-10 flex items-center justify-between rounded-xl bg-card/90 px-3 py-2 shadow-[var(--shadow-soft)] backdrop-blur">
+      <div className="absolute left-3 bottom-3 z-10 flex max-w-[calc(100%-5rem)] items-center gap-2 rounded-xl bg-card/90 px-3 py-2 shadow-[var(--shadow-soft)] backdrop-blur">
         <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
           Pollen index
         </span>
