@@ -85,7 +85,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           "Find allergy-safe routes around the city, check live pollen levels on any spot, and view a 5-day forecast.",
       },
       { name: "theme-color", content: "#D97706" },
-      { property: "og:title", content: "PollenPath" },
+      { property: "og:title", content: "PollenPath — Allergy-safe routes & forecast" },
       {
         property: "og:description",
         content: "Allergy-safe routes and live pollen forecast.",
@@ -93,6 +93,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:title", content: "PollenPath — Allergy-safe routes & forecast" },
+      { name: "description", content: "Mobile app for allergy sufferers to find low-pollen routes and view forecasts." },
+      { property: "og:description", content: "Mobile app for allergy sufferers to find low-pollen routes and view forecasts." },
+      { name: "twitter:description", content: "Mobile app for allergy sufferers to find low-pollen routes and view forecasts." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/4149f413-b2fd-437e-b317-3e0375b97d1d/id-preview-74ed983e--14f026bc-97ca-4d31-86a0-b903396383ad.lovable.app-1781300402428.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/4149f413-b2fd-437e-b317-3e0375b97d1d/id-preview-74ed983e--14f026bc-97ca-4d31-86a0-b903396383ad.lovable.app-1781300402428.png" },
     ],
     links: [
       {
