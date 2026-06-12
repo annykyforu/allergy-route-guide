@@ -47,37 +47,27 @@ function decodePolyline(encoded: string): Array<{ lat: number; lng: number }> {
 }
 
 async function pollenAt(lat: number, lng: number): Promise<number> {
-  // Returns max UPI across pollen types right now (0..5) using Open-Meteo.
+  // Returns max UPI across pollen types right now (0..5) via Google Pollen API.
   try {
     const params = new URLSearchParams({
-      latitude: String(lat),
-      longitude: String(lng),
-      current:
-        "alder_pollen,birch_pollen,grass_pollen,mugwort_pollen,olive_pollen,ragweed_pollen",
+      "location.latitude": String(lat),
+      "location.longitude": String(lng),
+      days: "1",
     });
     const res = await fetch(
-      `https://air-quality-api.open-meteo.com/v1/air-quality?${params.toString()}`,
+      `${GATEWAY_URL}/pollen/v1/forecast:lookup?${params.toString()}`,
+      { headers: headers() },
     );
     if (!res.ok) return 0;
     const json = (await res.json()) as {
-      current?: Record<string, number | null | string>;
+      dailyInfo?: Array<{
+        pollenTypeInfo?: Array<{ indexInfo?: { value?: number } }>;
+      }>;
     };
-    const c = json.current ?? {};
-    const vals = [
-      c.alder_pollen,
-      c.birch_pollen,
-      c.olive_pollen,
-      c.grass_pollen,
-      c.mugwort_pollen,
-      c.ragweed_pollen,
-    ].map((v) => (typeof v === "number" ? v : 0));
-    const peak = Math.max(0, ...vals);
-    if (peak <= 0) return 0;
-    if (peak < 5) return 1;
-    if (peak < 20) return 2;
-    if (peak < 50) return 3;
-    if (peak < 100) return 4;
-    return 5;
+    const today = json.dailyInfo?.[0];
+    const values = (today?.pollenTypeInfo ?? [])
+      .map((t) => t.indexInfo?.value ?? 0);
+    return values.length ? Math.max(...values) : 0;
   } catch {
     return 0;
   }
