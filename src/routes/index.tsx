@@ -68,7 +68,7 @@ function MapScreen() {
   const today = mutation.data?.dailyInfo?.[0];
 
   return (
-    <div className="relative flex h-screen w-full flex-col">
+    <div className="relative flex min-h-0 w-full flex-1 flex-col">
       {/* Header */}
       <header className="absolute inset-x-0 top-0 z-20 px-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
         <div className="rounded-2xl bg-card/95 px-4 py-3 shadow-[var(--shadow-soft)] backdrop-blur">
