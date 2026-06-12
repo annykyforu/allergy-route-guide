@@ -14,6 +14,22 @@ interface PollenMapProps {
     weight?: number;
     opacity?: number;
   }>;
+  // Multi-colored route segments, drawn one polyline per pair of points.
+  segments?: Array<{
+    from: { lat: number; lng: number };
+    to: { lat: number; lng: number };
+    color: string;
+    weight?: number;
+    opacity?: number;
+  }>;
+  // Hotspot markers with optional info-window content.
+  hotspots?: Array<{
+    lat: number;
+    lng: number;
+    color: string;
+    title: string;
+    breakdown: string;
+  }>;
 }
 
 export function PollenMap({
@@ -23,12 +39,17 @@ export function PollenMap({
   onMapClick,
   marker,
   polylines,
+  segments,
+  hotspots,
 }: PollenMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
   const overlayRef = useRef<google.maps.ImageMapType | null>(null);
   const markerRef = useRef<google.maps.Marker | null>(null);
   const polylineRefs = useRef<google.maps.Polyline[]>([]);
+  const segmentRefs = useRef<google.maps.Polyline[]>([]);
+  const hotspotRefs = useRef<google.maps.Marker[]>([]);
+  const infoRef = useRef<google.maps.InfoWindow | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Init map
@@ -127,13 +148,76 @@ export function PollenMap({
       });
       polylineRefs.current.push(line);
     });
-    // Fit bounds if any
-    if (polylines.length) {
-      const bounds = new google.maps.LatLngBounds();
-      polylines.forEach((pl) => pl.path.forEach((p) => bounds.extend(p)));
-      if (!bounds.isEmpty()) map.fitBounds(bounds, 60);
-    }
   }, [polylines]);
+
+  // Multi-colored segments
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !window.google) return;
+    segmentRefs.current.forEach((p) => p.setMap(null));
+    segmentRefs.current = [];
+    if (!segments) return;
+    segments.forEach((seg) => {
+      const line = new google.maps.Polyline({
+        path: [seg.from, seg.to],
+        map,
+        strokeColor: seg.color,
+        strokeWeight: seg.weight ?? 7,
+        strokeOpacity: seg.opacity ?? 0.95,
+      });
+      segmentRefs.current.push(line);
+    });
+  }, [segments]);
+
+  // Fit bounds whenever polylines/segments change.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !window.google) return;
+    const bounds = new google.maps.LatLngBounds();
+    polylines?.forEach((pl) => pl.path.forEach((p) => bounds.extend(p)));
+    segments?.forEach((s) => {
+      bounds.extend(s.from);
+      bounds.extend(s.to);
+    });
+    if (!bounds.isEmpty()) map.fitBounds(bounds, 60);
+  }, [polylines, segments]);
+
+  // Hotspot markers
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !window.google) return;
+    hotspotRefs.current.forEach((m) => m.setMap(null));
+    hotspotRefs.current = [];
+    if (!infoRef.current) {
+      infoRef.current = new google.maps.InfoWindow();
+    }
+    if (!hotspots) return;
+    hotspots.forEach((h) => {
+      const m = new google.maps.Marker({
+        position: { lat: h.lat, lng: h.lng },
+        map,
+        title: h.title,
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 8,
+          fillColor: h.color,
+          fillOpacity: 1,
+          strokeColor: "#fff",
+          strokeWeight: 2,
+        },
+      });
+      m.addListener("click", () => {
+        infoRef.current?.setContent(
+          `<div style="font: 500 12px system-ui; color:#111; max-width: 220px;">
+            <div style="font-weight:600;margin-bottom:4px;">${h.title}</div>
+            <div style="color:#555;line-height:1.4;">${h.breakdown}</div>
+          </div>`,
+        );
+        infoRef.current?.open({ map, anchor: m });
+      });
+      hotspotRefs.current.push(m);
+    });
+  }, [hotspots]);
 
   if (error) {
     return (
