@@ -31,6 +31,7 @@ function SafeRouteScreen() {
   const [origin, setOrigin] = useState("");
   const [destination, setDestination] = useState("");
   const [routes, setRoutes] = useState<SafeRoute[]>([]);
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const geocode = useServerFn(geocodeAddress);
@@ -39,6 +40,7 @@ function SafeRouteScreen() {
   const mutation = useMutation({
     mutationFn: async () => {
       setError(null);
+      setSelectedIndex(null);
       const [a, b] = await Promise.all([
         geocode({ data: { address: origin } }),
         geocode({ data: { address: destination } }),
@@ -51,19 +53,22 @@ function SafeRouteScreen() {
         },
       });
       setRoutes(result.routes);
+      const safest = result.routes.find((r) => r.safest) ?? result.routes[0];
+      if (safest) setSelectedIndex(safest.index);
       return result;
     },
     onError: (e: Error) => setError(e.message),
   });
 
-  const polylines = routes.map((r) => ({
-    path: r.decodedPath,
-    color: r.safest ? "#16A34A" : pollenColor(Math.round(r.averagePollen)).startsWith("var")
-      ? "#D97706"
-      : "#D97706",
-    weight: r.safest ? 7 : 4,
-    opacity: r.safest ? 0.95 : 0.55,
-  }));
+  const polylines = routes.map((r) => {
+    const isSelected = r.index === selectedIndex;
+    return {
+      path: r.decodedPath,
+      color: isSelected ? (r.safest ? "#16A34A" : "#2563EB") : "#9CA3AF",
+      weight: isSelected ? 7 : 4,
+      opacity: isSelected ? 0.95 : 0.45,
+    };
+  });
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -121,11 +126,23 @@ function SafeRouteScreen() {
           {routes.map((r) => (
             <li
               key={r.index}
+              role="button"
+              tabIndex={0}
+              onClick={() => setSelectedIndex(r.index)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  setSelectedIndex(r.index);
+                }
+              }}
+              aria-pressed={selectedIndex === r.index}
               className={
-                "rounded-2xl border p-4 " +
-                (r.safest
-                  ? "border-[oklch(0.65_0.18_145)] bg-[oklch(0.95_0.06_145)]"
-                  : "border-border bg-card")
+                "cursor-pointer rounded-2xl border p-4 transition-all focus:outline-none focus:ring-2 focus:ring-ring " +
+                (selectedIndex === r.index
+                  ? r.safest
+                    ? "border-[oklch(0.55_0.15_145)] bg-[oklch(0.95_0.06_145)] ring-2 ring-[oklch(0.55_0.15_145)]"
+                    : "border-primary bg-accent ring-2 ring-primary"
+                  : "border-border bg-card hover:border-foreground/30")
               }
             >
               <div className="flex items-center justify-between">
@@ -138,6 +155,11 @@ function SafeRouteScreen() {
                   <span className="text-sm font-semibold text-foreground">
                     Route {r.index + 1}
                   </span>
+                  {selectedIndex === r.index && (
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Selected
+                    </span>
+                  )}
                 </div>
                 <span className="text-xs text-muted-foreground">
                   {(r.distanceMeters / 1000).toFixed(1)} km ·{" "}
