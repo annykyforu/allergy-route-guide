@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import {
   getPollenForecast,
   geocodeAddress,
+  reverseGeocode,
   type PollenForecast,
 } from "@/lib/pollen.functions";
 import { pollenColor, pollenLabel } from "@/lib/google-maps-loader";
@@ -38,18 +39,24 @@ function ForecastScreen() {
   const [query, setQuery] = useState("");
   const geocode = useServerFn(geocodeAddress);
   const forecast = useServerFn(getPollenForecast);
+  const reverse = useServerFn(reverseGeocode);
 
   useEffect(() => {
     if (loc || typeof navigator === "undefined" || !navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition(
-      (pos) =>
-        setLoc({
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-          label: "Current location",
-        }),
-      () =>
-        setLoc({ lat: 40.7128, lng: -74.006, label: "New York City" }),
+      async (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        let label = "Current location";
+        try {
+          const r = await reverse({ data: { lat, lng } });
+          label = r.label;
+        } catch {
+          /* keep fallback */
+        }
+        setLoc({ lat, lng, label });
+      },
+      () => setLoc({ lat: 40.7128, lng: -74.006, label: "New York City" }),
       { timeout: 4000 },
     );
   }, [loc]);
