@@ -1,11 +1,12 @@
 import { Link } from "@tanstack/react-router";
-import { Map, Route as RouteIcon, CalendarDays } from "lucide-react";
+import { Map, Route as RouteIcon, CalendarDays, Settings } from "lucide-react";
 
 export function BottomNav() {
   const items = [
     { to: "/", label: "Map", Icon: Map },
     { to: "/safe-route", label: "Routes", Icon: RouteIcon },
     { to: "/forecast", label: "Forecast", Icon: CalendarDays },
+    { to: "/settings", label: "Settings", Icon: Settings },
   ] as const;
   return (
     <nav className="fixed bottom-0 inset-x-0 z-40 border-t border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
