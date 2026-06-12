@@ -133,3 +133,23 @@ export const reverseGeocode = createServerFn({ method: "POST" })
         : locality || region || json.results[0].formatted_address;
     return { label };
   });
+
+// Best-effort IP-based location using Cloudflare request headers (set by the
+// Worker runtime). Falls back to null if unavailable.
+export const getIpLocation = createServerFn({ method: "GET" }).handler(
+  async () => {
+    const lat = parseFloat(getRequestHeader("cf-iplatitude") ?? "");
+    const lng = parseFloat(getRequestHeader("cf-iplongitude") ?? "");
+    const city = getRequestHeader("cf-ipcity");
+    const country = getRequestHeader("cf-ipcountry");
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    const decoded = city
+      ? decodeURIComponent(city.replace(/\+/g, " "))
+      : undefined;
+    const label =
+      decoded && country
+        ? `${decoded}, ${country}`
+        : decoded || country || `${lat.toFixed(2)}, ${lng.toFixed(2)}`;
+    return { lat, lng, label };
+  },
+);
