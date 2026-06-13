@@ -6,6 +6,7 @@ import {
   useAllergies,
   type AllergyCategory,
 } from "@/hooks/use-allergies";
+import { SymptomLog } from "@/components/SymptomLog";
 
 export const Route = createFileRoute("/settings")({
   head: () => ({
@@ -144,6 +145,14 @@ function SettingsScreen() {
         <p className="mt-4 text-xs text-muted-foreground">
           Your selection is saved on this device.
         </p>
+
+        <h2 className="mt-8 mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Symptom log
+        </h2>
+        <p className="mb-3 text-xs text-muted-foreground">
+          Track how you feel day-to-day. Entries sync across your devices.
+        </p>
+        <SymptomLog />
       </section>
     </div>
   );
