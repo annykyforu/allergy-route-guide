@@ -35,7 +35,7 @@ const LAYERS: Array<{ id: PollenLayer; label: string; Icon: typeof Trees }> = [
 ];
 
 function MapScreen() {
-  const [layer, setLayer] = useState<PollenLayer>("TREE_UPI");
+  const [layer, setLayer] = useState<PollenLayer>("NONE");
   const [marker, setMarker] = useState<{ lat: number; lng: number } | null>(
     null,
   );
