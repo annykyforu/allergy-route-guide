@@ -1,12 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Check, Leaf } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { Check, Leaf, NotebookPen, ChevronRight } from "lucide-react";
 import {
   CATEGORY_OPTIONS,
   PLANTS_BY_CATEGORY,
   useAllergies,
   type AllergyCategory,
 } from "@/hooks/use-allergies";
-import { SymptomLog } from "@/components/SymptomLog";
 
 export const Route = createFileRoute("/settings")({
   head: () => ({
@@ -147,12 +147,25 @@ function SettingsScreen() {
         </p>
 
         <h2 className="mt-8 mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Symptom log
+          More
         </h2>
-        <p className="mb-3 text-xs text-muted-foreground">
-          Track how you feel day-to-day. Entries sync across your devices.
-        </p>
-        <SymptomLog />
+        <Link
+          to="/symptoms"
+          className="flex w-full items-center gap-3 rounded-2xl border border-border bg-card p-4 text-left transition-colors hover:border-foreground/30"
+        >
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-muted text-muted-foreground">
+            <NotebookPen className="h-4 w-4" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-semibold text-foreground">
+              Symptom log
+            </span>
+            <span className="block text-xs text-muted-foreground">
+              Track how you feel day-to-day.
+            </span>
+          </span>
+          <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+        </Link>
       </section>
     </div>
   );
