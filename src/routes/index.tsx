@@ -57,7 +57,7 @@ function MapScreen() {
   const lookup = useServerFn(getPollenForecast);
   const mutation = useMutation({
     mutationFn: (loc: { lat: number; lng: number }) =>
-      lookup({ data: { ...loc, days: 1 } }),
+      lookup({ data: { ...loc, days: 5 } }),
   });
 
   const handleClick = (lat: number, lng: number) => {
@@ -66,6 +66,7 @@ function MapScreen() {
   };
 
   const today = mutation.data?.dailyInfo?.[0];
+  const upcoming = mutation.data?.dailyInfo?.slice(1) ?? [];
 
   return (
     <div className="relative flex min-h-0 w-full flex-1 flex-col">
@@ -189,6 +190,44 @@ function MapScreen() {
                     </div>
                   );
                 })}
+              </div>
+            )}
+            {upcoming.length > 0 && (
+              <div className="mt-3">
+                <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Next {upcoming.length} days
+                </p>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {upcoming.map((day, idx) => {
+                    const d = new Date(
+                      day.date.year,
+                      day.date.month - 1,
+                      day.date.day,
+                    );
+                    const max = Math.max(
+                      0,
+                      ...day.pollenTypeInfo.map((t) => t.indexInfo?.value ?? 0),
+                    );
+                    return (
+                      <div
+                        key={idx}
+                        className="rounded-lg border border-border bg-background p-1.5 text-center"
+                      >
+                        <p className="text-[10px] font-medium text-muted-foreground">
+                          {d.toLocaleDateString(undefined, { weekday: "short" })}
+                        </p>
+                        <span
+                          aria-hidden
+                          className="mx-auto mt-1 block h-2 w-2 rounded-full"
+                          style={{ background: pollenColor(max) }}
+                        />
+                        <p className="mt-0.5 text-[10px] font-semibold text-foreground">
+                          {max}/5
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
             {today &&
