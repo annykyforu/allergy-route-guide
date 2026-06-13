@@ -12,7 +12,7 @@ import {
   type PollenSample,
 } from "@/lib/safe-route.functions";
 import { geocodeAddress } from "@/lib/pollen.functions";
-import { pollenColor, pollenLabel } from "@/lib/google-maps-loader";
+import { pollenColor, pollenHex, pollenLabel } from "@/lib/google-maps-loader";
 import { useAllergies } from "@/hooks/use-allergies";
 import { Shield, AlertTriangle, Loader2, Footprints, Bike, Bus, Car, Settings as SettingsIcon } from "lucide-react";
 
@@ -96,7 +96,7 @@ function SafeRouteScreen() {
     return samples.slice(0, -1).map((s, i) => ({
       from: { lat: s.lat, lng: s.lng },
       to: { lat: samples[i + 1].lat, lng: samples[i + 1].lng },
-      color: pollenColor(Math.round((s.personalized + samples[i + 1].personalized) / 2)),
+      color: pollenHex((s.personalized + samples[i + 1].personalized) / 2),
       weight: 8,
       opacity: 0.95,
     }));
@@ -112,7 +112,7 @@ function SafeRouteScreen() {
       .map((s) => ({
         lat: s.lat,
         lng: s.lng,
-        color: pollenColor(Math.round(s.personalized)),
+        color: pollenHex(s.personalized),
         title: `${pollenLabel(Math.round(s.personalized))} pollen here`,
         breakdown: buildBreakdownHtml(s),
       }));

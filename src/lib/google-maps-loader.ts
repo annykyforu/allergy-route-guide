@@ -48,6 +48,23 @@ export function pollenColor(value: number): string {
   return "var(--pollen-5)";
 }
 
+// Google Maps' Polyline/Marker APIs do NOT accept CSS variables — they need a
+// concrete color string. Keep these in sync with the --pollen-* tokens in
+// src/styles.css so the on-map rendering matches the rest of the UI.
+const POLLEN_HEX = [
+  "#BFE3C0", // 0 - none / green
+  "#E8E27A", // 1 - very low / yellow-green
+  "#F2C766", // 2 - low / amber
+  "#E89149", // 3 - moderate / orange
+  "#D85F3A", // 4 - high / red-orange
+  "#B83A2C", // 5 - very high / red
+];
+
+export function pollenHex(value: number): string {
+  const v = Math.max(0, Math.min(5, Math.round(value)));
+  return POLLEN_HEX[v];
+}
+
 export function pollenLabel(value: number): string {
   if (value <= 0) return "None";
   if (value === 1) return "Very Low";
