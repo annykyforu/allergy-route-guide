@@ -334,11 +334,24 @@ export const findSafeRoutes = createServerFn({ method: "POST" })
         safest: false,
       });
     }
-    // Mark the safest (lowest personalized average).
-    enriched.sort((a, b) => a.personalizedAvg - b.personalizedAvg);
-    if (enriched.length) enriched[0].safest = true;
-    // Re-sort by original order for stable rendering.
-    enriched.sort((a, b) => a.index - b.index);
+    // Mark the safest only if it is meaningfully lower than the others.
+    // The pollen API has coarse spatial resolution, so nearby routes often
+    // share identical scores; in that case no route is genuinely "safer".
+    if (enriched.length > 1) {
+      const sorted = [...enriched].sort(
+        (a, b) => a.personalizedAvg - b.personalizedAvg,
+      );
+      const best = sorted[0];
+      const next = sorted[1];
+      const meaningfullyLower =
+        next.personalizedAvg - best.personalizedAvg >= 0.25 ||
+        best.personalizedMax < next.personalizedMax;
+      if (meaningfullyLower) {
+        enriched.find((r) => r.index === best.index)!.safest = true;
+      }
+    } else if (enriched.length === 1) {
+      enriched[0].safest = true;
+    }
     return { routes: enriched };
   });
 
