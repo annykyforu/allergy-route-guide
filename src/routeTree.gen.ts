@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SymptomsRouteImport } from './routes/symptoms'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SafeRouteRouteImport } from './routes/safe-route'
 import { Route as ForecastRouteImport } from './routes/forecast'
@@ -16,6 +17,11 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiPollenTileSplatRouteImport } from './routes/api/pollen-tile/$'
 
+const SymptomsRoute = SymptomsRouteImport.update({
+  id: '/symptoms',
+  path: '/symptoms',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -53,6 +59,7 @@ export interface FileRoutesByFullPath {
   '/forecast': typeof ForecastRoute
   '/safe-route': typeof SafeRouteRoute
   '/settings': typeof SettingsRoute
+  '/symptoms': typeof SymptomsRoute
   '/api/pollen-tile/$': typeof ApiPollenTileSplatRoute
 }
 export interface FileRoutesByTo {
@@ -61,6 +68,7 @@ export interface FileRoutesByTo {
   '/forecast': typeof ForecastRoute
   '/safe-route': typeof SafeRouteRoute
   '/settings': typeof SettingsRoute
+  '/symptoms': typeof SymptomsRoute
   '/api/pollen-tile/$': typeof ApiPollenTileSplatRoute
 }
 export interface FileRoutesById {
@@ -70,6 +78,7 @@ export interface FileRoutesById {
   '/forecast': typeof ForecastRoute
   '/safe-route': typeof SafeRouteRoute
   '/settings': typeof SettingsRoute
+  '/symptoms': typeof SymptomsRoute
   '/api/pollen-tile/$': typeof ApiPollenTileSplatRoute
 }
 export interface FileRouteTypes {
@@ -80,6 +89,7 @@ export interface FileRouteTypes {
     | '/forecast'
     | '/safe-route'
     | '/settings'
+    | '/symptoms'
     | '/api/pollen-tile/$'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -88,6 +98,7 @@ export interface FileRouteTypes {
     | '/forecast'
     | '/safe-route'
     | '/settings'
+    | '/symptoms'
     | '/api/pollen-tile/$'
   id:
     | '__root__'
@@ -96,6 +107,7 @@ export interface FileRouteTypes {
     | '/forecast'
     | '/safe-route'
     | '/settings'
+    | '/symptoms'
     | '/api/pollen-tile/$'
   fileRoutesById: FileRoutesById
 }
@@ -105,11 +117,19 @@ export interface RootRouteChildren {
   ForecastRoute: typeof ForecastRoute
   SafeRouteRoute: typeof SafeRouteRoute
   SettingsRoute: typeof SettingsRoute
+  SymptomsRoute: typeof SymptomsRoute
   ApiPollenTileSplatRoute: typeof ApiPollenTileSplatRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/symptoms': {
+      id: '/symptoms'
+      path: '/symptoms'
+      fullPath: '/symptoms'
+      preLoaderRoute: typeof SymptomsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings': {
       id: '/settings'
       path: '/settings'
@@ -161,8 +181,19 @@ const rootRouteChildren: RootRouteChildren = {
   ForecastRoute: ForecastRoute,
   SafeRouteRoute: SafeRouteRoute,
   SettingsRoute: SettingsRoute,
+  SymptomsRoute: SymptomsRoute,
   ApiPollenTileSplatRoute: ApiPollenTileSplatRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

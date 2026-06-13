@@ -1,11 +1,12 @@
 import { Link } from "@tanstack/react-router";
-import { Map, Route as RouteIcon, CalendarDays, Settings } from "lucide-react";
+import { Map, Route as RouteIcon, CalendarDays, NotebookPen, Settings } from "lucide-react";
 
 export function BottomNav() {
   const items = [
     { to: "/", label: "Map", Icon: Map },
     { to: "/safe-route", label: "Routes", Icon: RouteIcon },
     { to: "/forecast", label: "Forecast", Icon: CalendarDays },
+    { to: "/symptoms", label: "Symptoms", Icon: NotebookPen },
     { to: "/settings", label: "Settings", Icon: Settings },
   ] as const;
   return (
