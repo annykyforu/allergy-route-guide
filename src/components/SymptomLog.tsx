@@ -1,7 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { Loader2, Plus, Trash2, LogOut } from "lucide-react";
+import { Loader2, Plus, Trash2, LogOut, Cloud, CloudOff } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -30,6 +30,26 @@ const SYMPTOM_OPTIONS = [
 
 const SEVERITY_LABEL = ["", "Very mild", "Mild", "Moderate", "Strong", "Severe"];
 
+const LOCAL_KEY = "pollenpath.symptoms";
+
+function readLocal(): SymptomEntry[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(LOCAL_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeLocal(entries: SymptomEntry[]) {
+  try {
+    window.localStorage.setItem(LOCAL_KEY, JSON.stringify(entries));
+  } catch {}
+}
+
 export function SymptomLog() {
   const { user, loading, signOut } = useAuth();
 
@@ -41,25 +61,58 @@ export function SymptomLog() {
     );
   }
 
-  if (!user) {
-    return (
-      <div className="rounded-2xl border border-border bg-card p-4">
-        <p className="text-sm font-semibold text-foreground">Track your symptoms</p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Sign in to log how you feel each day and see it next to your pollen
-          exposure.
-        </p>
+  if (!user) return <SymptomLogLocal />;
+  return <SymptomLogAuthed userEmail={user.email ?? ""} onSignOut={() => signOut()} />;
+}
+
+function SymptomLogLocal() {
+  const [entries, setEntries] = useState<SymptomEntry[]>([]);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    setEntries(readLocal());
+  }, []);
+
+  const save = (entry: Omit<SymptomEntry, "id" | "logged_at">) => {
+    const next: SymptomEntry = {
+      id: crypto.randomUUID(),
+      logged_at: new Date().toISOString(),
+      ...entry,
+    };
+    const updated = [next, ...entries];
+    setEntries(updated);
+    writeLocal(updated);
+    toast.success("Logged on this device");
+    setOpen(false);
+  };
+
+  const remove = (id: string) => {
+    const updated = entries.filter((e) => e.id !== id);
+    setEntries(updated);
+    writeLocal(updated);
+    toast.success("Entry removed");
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-2 rounded-xl border border-dashed border-border bg-card/50 px-3 py-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <CloudOff className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          <p className="text-[11px] text-muted-foreground">
+            Saved on this device only.
+          </p>
+        </div>
         <Link
           to="/auth"
-          className="mt-3 inline-flex items-center justify-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+          className="shrink-0 text-[11px] font-semibold text-primary hover:underline"
         >
-          Sign in to log symptoms
+          Sign in to sync
         </Link>
       </div>
-    );
-  }
 
-  return <SymptomLogAuthed userEmail={user.email ?? ""} onSignOut={() => signOut()} />;
+      <EntryList entries={entries} onRemove={remove} open={open} setOpen={setOpen} onSave={save} />
+    </div>
+  );
 }
 
 function SymptomLogAuthed({ userEmail, onSignOut }: { userEmail: string; onSignOut: () => void }) {
@@ -91,10 +144,95 @@ function SymptomLogAuthed({ userEmail, onSignOut }: { userEmail: string; onSignO
     onError: (e) => toast.error(e instanceof Error ? e.message : "Could not delete"),
   });
 
+  // Auto-migrate local entries to cloud on first sign-in.
+  useEffect(() => {
+    const local = readLocal();
+    if (local.length === 0) return;
+    (async () => {
+      const { data: userRes } = await supabase.auth.getUser();
+      if (!userRes.user) return;
+      const rows = local.map((e) => ({
+        user_id: userRes.user!.id,
+        logged_at: e.logged_at,
+        severity: e.severity,
+        symptoms: e.symptoms,
+        triggers: e.triggers ?? [],
+        notes: e.notes,
+      }));
+      const { error } = await supabase.from("symptoms").insert(rows);
+      if (!error) {
+        writeLocal([]);
+        toast.success(`Synced ${rows.length} local entries`);
+        qc.invalidateQueries({ queryKey: ["symptoms"] });
+      }
+    })();
+  }, [qc]);
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-2 rounded-xl border border-border bg-card px-3 py-2">
+        <div className="min-w-0">
+          <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+            <Cloud className="h-3.5 w-3.5" />
+            <span className="truncate">Synced as {userEmail}</span>
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onSignOut}
+          className="inline-flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground"
+        >
+          <LogOut className="h-3 w-3" /> Sign out
+        </button>
+      </div>
+
+      <EntryList
+        entries={entries}
+        loading={isLoading}
+        onRemove={(id) => removeMut.mutate(id)}
+        open={open}
+        setOpen={setOpen}
+        onSave={async (entry) => {
+          const { data: userRes } = await supabase.auth.getUser();
+          if (!userRes.user) return;
+          const { error } = await supabase.from("symptoms").insert({
+            user_id: userRes.user.id,
+            severity: entry.severity,
+            symptoms: entry.symptoms,
+            triggers: entry.triggers,
+            notes: entry.notes,
+          });
+          if (error) {
+            toast.error(error.message);
+            return;
+          }
+          toast.success("Logged");
+          setOpen(false);
+          qc.invalidateQueries({ queryKey: ["symptoms"] });
+        }}
+      />
+    </div>
+  );
+}
+
+function EntryList({
+  entries,
+  loading,
+  onRemove,
+  open,
+  setOpen,
+  onSave,
+}: {
+  entries: SymptomEntry[];
+  loading?: boolean;
+  onRemove: (id: string) => void;
+  open: boolean;
+  setOpen: (v: boolean) => void;
+  onSave: (entry: Omit<SymptomEntry, "id" | "logged_at">) => void | Promise<void>;
+}) {
   const stats = useMemo(() => {
     if (entries.length === 0) return null;
-    const avg =
-      entries.reduce((sum, e) => sum + e.severity, 0) / entries.length;
+    const avg = entries.reduce((sum, e) => sum + e.severity, 0) / entries.length;
     const counts: Record<string, number> = {};
     for (const e of entries) for (const s of e.symptoms) counts[s] = (counts[s] ?? 0) + 1;
     const top = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
@@ -102,20 +240,7 @@ function SymptomLogAuthed({ userEmail, onSignOut }: { userEmail: string; onSignO
   }, [entries]);
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <div className="min-w-0">
-          <p className="truncate text-xs text-muted-foreground">Signed in as {userEmail}</p>
-        </div>
-        <button
-          type="button"
-          onClick={onSignOut}
-          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-        >
-          <LogOut className="h-3 w-3" /> Sign out
-        </button>
-      </div>
-
+    <>
       {stats && (
         <div className="rounded-2xl border border-border bg-card p-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -138,13 +263,7 @@ function SymptomLogAuthed({ userEmail, onSignOut }: { userEmail: string; onSignO
       )}
 
       {open ? (
-        <NewEntryForm
-          onClose={() => setOpen(false)}
-          onSaved={() => {
-            setOpen(false);
-            qc.invalidateQueries({ queryKey: ["symptoms"] });
-          }}
-        />
+        <NewEntryForm onClose={() => setOpen(false)} onSave={onSave} />
       ) : (
         <button
           type="button"
@@ -156,12 +275,12 @@ function SymptomLogAuthed({ userEmail, onSignOut }: { userEmail: string; onSignO
       )}
 
       <div className="space-y-2">
-        {isLoading && (
+        {loading && (
           <div className="flex items-center justify-center py-6">
             <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
           </div>
         )}
-        {!isLoading && entries.length === 0 && (
+        {!loading && entries.length === 0 && (
           <p className="rounded-2xl border border-dashed border-border bg-card/50 p-4 text-center text-xs text-muted-foreground">
             No entries yet. Log how you feel today.
           </p>
@@ -183,7 +302,7 @@ function SymptomLogAuthed({ userEmail, onSignOut }: { userEmail: string; onSignO
               <button
                 type="button"
                 aria-label="Delete entry"
-                onClick={() => removeMut.mutate(e.id)}
+                onClick={() => onRemove(e.id)}
                 className="rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
               >
                 <Trash2 className="h-3.5 w-3.5" />
@@ -212,11 +331,17 @@ function SymptomLogAuthed({ userEmail, onSignOut }: { userEmail: string; onSignO
           </article>
         ))}
       </div>
-    </div>
+    </>
   );
 }
 
-function NewEntryForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+function NewEntryForm({
+  onClose,
+  onSave,
+}: {
+  onClose: () => void;
+  onSave: (entry: Omit<SymptomEntry, "id" | "logged_at">) => void | Promise<void>;
+}) {
   const [severity, setSeverity] = useState(3);
   const [selected, setSelected] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
@@ -228,26 +353,16 @@ function NewEntryForm({ onClose, onSaved }: { onClose: () => void; onSaved: () =
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true);
-    const { data: userRes } = await supabase.auth.getUser();
-    if (!userRes.user) {
-      toast.error("You're signed out");
+    try {
+      await onSave({
+        severity,
+        symptoms: selected,
+        triggers: [],
+        notes: notes.trim() || null,
+      });
+    } finally {
       setBusy(false);
-      return;
     }
-    const { error } = await supabase.from("symptoms").insert({
-      user_id: userRes.user.id,
-      severity,
-      symptoms: selected,
-      triggers: [],
-      notes: notes.trim() || null,
-    });
-    setBusy(false);
-    if (error) {
-      toast.error(error.message);
-      return;
-    }
-    toast.success("Logged");
-    onSaved();
   };
 
   return (
