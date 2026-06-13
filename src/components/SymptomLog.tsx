@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { Loader2, Plus, Trash2, LogOut, Cloud, CloudOff } from "lucide-react";
+import { Loader2, Plus, Trash2, Pencil, LogOut, Cloud, CloudOff } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -68,6 +68,7 @@ export function SymptomLog() {
 function SymptomLogLocal() {
   const [entries, setEntries] = useState<SymptomEntry[]>([]);
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<SymptomEntry | null>(null);
 
   useEffect(() => {
     setEntries(readLocal());
@@ -84,6 +85,14 @@ function SymptomLogLocal() {
     writeLocal(updated);
     toast.success("Logged on this device");
     setOpen(false);
+  };
+
+  const update = (id: string, entry: Omit<SymptomEntry, "id" | "logged_at">) => {
+    const updated = entries.map((e) => (e.id === id ? { ...e, ...entry } : e));
+    setEntries(updated);
+    writeLocal(updated);
+    toast.success("Entry updated");
+    setEditing(null);
   };
 
   const remove = (id: string) => {
@@ -110,7 +119,16 @@ function SymptomLogLocal() {
         </Link>
       </div>
 
-      <EntryList entries={entries} onRemove={remove} open={open} setOpen={setOpen} onSave={save} />
+      <EntryList
+        entries={entries}
+        onRemove={remove}
+        open={open}
+        setOpen={setOpen}
+        onSave={save}
+        editing={editing}
+        setEditing={setEditing}
+        onUpdate={async (id, entry) => update(id, entry)}
+      />
     </div>
   );
 }
@@ -118,6 +136,7 @@ function SymptomLogLocal() {
 function SymptomLogAuthed({ userEmail, onSignOut }: { userEmail: string; onSignOut: () => void }) {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<SymptomEntry | null>(null);
 
   const { data: entries = [], isLoading } = useQuery({
     queryKey: ["symptoms"],
@@ -192,6 +211,26 @@ function SymptomLogAuthed({ userEmail, onSignOut }: { userEmail: string; onSignO
         onRemove={(id) => removeMut.mutate(id)}
         open={open}
         setOpen={setOpen}
+        editing={editing}
+        setEditing={setEditing}
+        onUpdate={async (id, entry) => {
+          const { error } = await supabase
+            .from("symptoms")
+            .update({
+              severity: entry.severity,
+              symptoms: entry.symptoms,
+              triggers: entry.triggers,
+              notes: entry.notes,
+            })
+            .eq("id", id);
+          if (error) {
+            toast.error(error.message);
+            return;
+          }
+          toast.success("Entry updated");
+          setEditing(null);
+          qc.invalidateQueries({ queryKey: ["symptoms"] });
+        }}
         onSave={async (entry) => {
           const { data: userRes } = await supabase.auth.getUser();
           if (!userRes.user) return;
@@ -222,6 +261,9 @@ function EntryList({
   open,
   setOpen,
   onSave,
+  editing,
+  setEditing,
+  onUpdate,
 }: {
   entries: SymptomEntry[];
   loading?: boolean;
@@ -229,6 +271,9 @@ function EntryList({
   open: boolean;
   setOpen: (v: boolean) => void;
   onSave: (entry: Omit<SymptomEntry, "id" | "logged_at">) => void | Promise<void>;
+  editing: SymptomEntry | null;
+  setEditing: (v: SymptomEntry | null) => void;
+  onUpdate: (id: string, entry: Omit<SymptomEntry, "id" | "logged_at">) => void | Promise<void>;
 }) {
   const stats = useMemo(() => {
     if (entries.length === 0) return null;
@@ -262,7 +307,15 @@ function EntryList({
         </div>
       )}
 
-      {open ? (
+      {editing ? (
+        <NewEntryForm
+          initial={editing}
+          onClose={() => setEditing(null)}
+          onSave={async (entry) => {
+            await onUpdate(editing.id, entry);
+          }}
+        />
+      ) : open ? (
         <NewEntryForm onClose={() => setOpen(false)} onSave={onSave} />
       ) : (
         <button
@@ -299,14 +352,27 @@ function EntryList({
                   })}
                 </p>
               </div>
-              <button
-                type="button"
-                aria-label="Delete entry"
-                onClick={() => onRemove(e.id)}
-                className="rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  aria-label="Edit entry"
+                  onClick={() => {
+                    setEditing(e);
+                    setOpen(false);
+                  }}
+                  className="rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  aria-label="Delete entry"
+                  onClick={() => onRemove(e.id)}
+                  className="rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
             </header>
             {e.symptoms.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-1.5">
@@ -336,15 +402,17 @@ function EntryList({
 }
 
 function NewEntryForm({
+  initial,
   onClose,
   onSave,
 }: {
+  initial?: SymptomEntry;
   onClose: () => void;
   onSave: (entry: Omit<SymptomEntry, "id" | "logged_at">) => void | Promise<void>;
 }) {
-  const [severity, setSeverity] = useState(3);
-  const [selected, setSelected] = useState<string[]>([]);
-  const [notes, setNotes] = useState("");
+  const [severity, setSeverity] = useState(initial?.severity ?? 3);
+  const [selected, setSelected] = useState<string[]>(initial?.symptoms ?? []);
+  const [notes, setNotes] = useState(initial?.notes ?? "");
   const [busy, setBusy] = useState(false);
 
   const toggle = (id: string) =>
