@@ -196,6 +196,41 @@ function MapScreen() {
         <PollenScale />
       </div>
 
+      {/* Green zones legend — only when the layer is on */}
+      {greenZones && (
+        <div className="absolute right-3 bottom-3 z-10 max-w-[18rem] rounded-xl border border-border bg-card/95 p-3 shadow-[var(--shadow-soft)] backdrop-blur">
+          <div className="flex items-center gap-1.5">
+            <Leaf className="h-3.5 w-3.5 text-foreground" />
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground">
+              Green zones
+            </span>
+          </div>
+          <div className="mt-2 flex items-center gap-2">
+            <span
+              aria-hidden
+              className="h-2.5 w-2.5 rounded-full ring-2 ring-card"
+              style={{ background: pollenHex(Math.min(5, baseIndex + 1)) }}
+            />
+            <span className="text-[11px] text-foreground">
+              Parks &amp; gardens — index{" "}
+              <span className="font-semibold">
+                {baseIndex} → {Math.min(5, baseIndex + 1)}/5
+              </span>
+            </span>
+          </div>
+          <p className="mt-2 text-[10px] leading-snug text-muted-foreground">
+            Dots mark parks within ~2.5 km of your tap. We bump the area's
+            pollen index by one level there, because flowering trees and
+            grass concentrate pollen above urban green space. Dense street
+            grids without greenery typically sit at or below the baseline.
+          </p>
+          <p className="mt-1.5 rounded-md bg-accent/40 p-1.5 text-[10px] leading-snug text-accent-foreground">
+            <span className="font-semibold">Estimate, not a measurement.</span>{" "}
+            Modeled from proximity to green areas — no street-level sensor data.
+          </p>
+        </div>
+      )}
+
       {/* Bottom sheet */}
       {marker && (
         <div className="absolute inset-x-0 bottom-16 z-30 px-3">
