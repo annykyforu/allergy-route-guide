@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { PollenMap } from "@/components/PollenMap";
 import { PollenBadge, PollenScale } from "@/components/PollenLevel";
+import { SpikeAlert } from "@/components/SpikeAlert";
 import {
   getPollenForecast,
   getNearbyGreenAreas,
@@ -174,6 +175,10 @@ function MapScreen() {
           {greenQuery.isFetching && greenZones && (
             <span className="text-[10px] text-muted-foreground">Loading…</span>
           )}
+        </div>
+        {/* Spike alert for saved home location */}
+        <div className="mt-2">
+          <SpikeAlert />
         </div>
       </header>
 
