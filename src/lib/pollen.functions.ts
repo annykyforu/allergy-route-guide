@@ -153,3 +153,55 @@ export const getIpLocation = createServerFn({ method: "GET" }).handler(
     return { lat, lng, label };
   },
 );
+
+// Find nearby green areas (parks, gardens, cemeteries) using Places API (New).
+// Used by the "Green zones" map layer to model intra-city pollen variation:
+// parks tend to elevate local pollen vs. dense street grids.
+export const getNearbyGreenAreas = createServerFn({ method: "POST" })
+  .inputValidator(
+    z.object({
+      lat: z.number().min(-90).max(90),
+      lng: z.number().min(-180).max(180),
+      radius: z.number().min(100).max(5000).default(2000),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const res = await fetch(`${GATEWAY_URL}/places/v1/places:searchNearby`, {
+      method: "POST",
+      headers: {
+        ...headers(),
+        "X-Goog-FieldMask":
+          "places.id,places.displayName,places.location,places.types",
+      },
+      body: JSON.stringify({
+        includedTypes: ["park", "garden"],
+        maxResultCount: 20,
+        locationRestriction: {
+          circle: {
+            center: { latitude: data.lat, longitude: data.lng },
+            radius: data.radius,
+          },
+        },
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`Places API ${res.status}: ${body.slice(0, 200)}`);
+    }
+    const json = (await res.json()) as {
+      places?: Array<{
+        id: string;
+        displayName?: { text: string };
+        location?: { latitude: number; longitude: number };
+        types?: string[];
+      }>;
+    };
+    return (json.places ?? [])
+      .filter((p) => p.location)
+      .map((p) => ({
+        id: p.id,
+        name: p.displayName?.text ?? "Green area",
+        lat: p.location!.latitude,
+        lng: p.location!.longitude,
+      }));
+  });
