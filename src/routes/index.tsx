@@ -1,13 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useState, useEffect } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useState, useEffect, useMemo } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { PollenMap } from "@/components/PollenMap";
 import { PollenBadge, PollenScale } from "@/components/PollenLevel";
-import { getPollenForecast } from "@/lib/pollen.functions";
+import {
+  getPollenForecast,
+  getNearbyGreenAreas,
+} from "@/lib/pollen.functions";
 import type { PollenLayer } from "@/lib/google-maps-loader";
-import { pollenLabel, pollenColor } from "@/lib/google-maps-loader";
-import { Wind, Flower2, Trees, X } from "lucide-react";
+import { pollenLabel, pollenColor, pollenHex } from "@/lib/google-maps-loader";
+import { Wind, Flower2, Trees, X, Leaf } from "lucide-react";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -36,6 +39,7 @@ const LAYERS: Array<{ id: PollenLayer; label: string; Icon: typeof Trees }> = [
 
 function MapScreen() {
   const [layer, setLayer] = useState<PollenLayer>("NONE");
+  const [greenZones, setGreenZones] = useState(false);
   const [marker, setMarker] = useState<{ lat: number; lng: number } | null>(
     null,
   );
@@ -67,6 +71,45 @@ function MapScreen() {
 
   const today = mutation.data?.dailyInfo?.[0];
   const upcoming = mutation.data?.dailyInfo?.slice(1) ?? [];
+
+  // Base pollen index for the selected/visible area — drives the green-zone
+  // boost color so park hotspots match the surrounding heatmap intensity.
+  const baseIndex = today
+    ? Math.max(
+        0,
+        ...today.pollenTypeInfo.map((t) => t.indexInfo?.value ?? 0),
+      )
+    : 2;
+
+  // Anchor for the nearby-parks query: prefer the user's tapped marker,
+  // fall back to map center, then to Vienna default.
+  const anchor = marker ?? center ?? { lat: 48.2082, lng: 16.3738 };
+  const fetchGreen = useServerFn(getNearbyGreenAreas);
+  const greenQuery = useQuery({
+    queryKey: [
+      "green-areas",
+      anchor.lat.toFixed(2),
+      anchor.lng.toFixed(2),
+    ],
+    queryFn: () =>
+      fetchGreen({
+        data: { lat: anchor.lat, lng: anchor.lng, radius: 2500 },
+      }),
+    enabled: greenZones,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const hotspots = useMemo(() => {
+    if (!greenZones || !greenQuery.data) return undefined;
+    const boosted = Math.min(5, baseIndex + 1);
+    return greenQuery.data.map((g) => ({
+      lat: g.lat,
+      lng: g.lng,
+      color: pollenHex(boosted),
+      title: g.name,
+      breakdown: `Estimated local boost: index ${baseIndex} → ${boosted}/5 near this green area. Modeled from proximity, not measured.`,
+    }));
+  }, [greenZones, greenQuery.data, baseIndex]);
 
   return (
     <div className="relative flex min-h-0 w-full flex-1 flex-col">
@@ -110,6 +153,28 @@ function MapScreen() {
             <X className="h-3.5 w-3.5" />
           </button>
         </div>
+        {/* Green zones toggle */}
+        <div className="mt-2 flex items-center gap-2 rounded-2xl bg-card/95 px-3 py-2 shadow-[var(--shadow-soft)] backdrop-blur">
+          <button
+            onClick={() => setGreenZones((v) => !v)}
+            aria-pressed={greenZones}
+            className={
+              "inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs font-medium transition-colors " +
+              (greenZones
+                ? "bg-[image:var(--gradient-warn)] text-primary-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground")
+            }
+          >
+            <Leaf className="h-3.5 w-3.5" />
+            Green zones
+          </button>
+          <p className="flex-1 text-[10px] leading-tight text-muted-foreground">
+            Estimated boost near parks. Tap a dot for details.
+          </p>
+          {greenQuery.isFetching && greenZones && (
+            <span className="text-[10px] text-muted-foreground">Loading…</span>
+          )}
+        </div>
       </header>
 
       {/* Map */}
@@ -119,6 +184,7 @@ function MapScreen() {
           center={center}
           onMapClick={handleClick}
           marker={marker}
+          hotspots={hotspots}
         />
       </div>
 
