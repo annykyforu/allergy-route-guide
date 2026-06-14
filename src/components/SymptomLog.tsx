@@ -74,21 +74,22 @@ function SymptomLogLocal() {
     setEntries(readLocal());
   }, []);
 
-  const save = (entry: Omit<SymptomEntry, "id" | "logged_at">) => {
+  const save = (entry: Omit<SymptomEntry, "id">) => {
     const next: SymptomEntry = {
       id: crypto.randomUUID(),
-      logged_at: new Date().toISOString(),
       ...entry,
     };
     const updated = [next, ...entries];
+    updated.sort((a, b) => new Date(b.logged_at).getTime() - new Date(a.logged_at).getTime());
     setEntries(updated);
     writeLocal(updated);
     toast.success("Logged on this device");
     setOpen(false);
   };
 
-  const update = (id: string, entry: Omit<SymptomEntry, "id" | "logged_at">) => {
+  const update = (id: string, entry: Omit<SymptomEntry, "id">) => {
     const updated = entries.map((e) => (e.id === id ? { ...e, ...entry } : e));
+    updated.sort((a, b) => new Date(b.logged_at).getTime() - new Date(a.logged_at).getTime());
     setEntries(updated);
     writeLocal(updated);
     toast.success("Entry updated");
@@ -217,6 +218,7 @@ function SymptomLogAuthed({ userEmail, onSignOut }: { userEmail: string; onSignO
           const { error } = await supabase
             .from("symptoms")
             .update({
+              logged_at: entry.logged_at,
               severity: entry.severity,
               symptoms: entry.symptoms,
               triggers: entry.triggers,
@@ -236,6 +238,7 @@ function SymptomLogAuthed({ userEmail, onSignOut }: { userEmail: string; onSignO
           if (!userRes.user) return;
           const { error } = await supabase.from("symptoms").insert({
             user_id: userRes.user.id,
+            logged_at: entry.logged_at,
             severity: entry.severity,
             symptoms: entry.symptoms,
             triggers: entry.triggers,
@@ -270,10 +273,10 @@ function EntryList({
   onRemove: (id: string) => void;
   open: boolean;
   setOpen: (v: boolean) => void;
-  onSave: (entry: Omit<SymptomEntry, "id" | "logged_at">) => void | Promise<void>;
+  onSave: (entry: Omit<SymptomEntry, "id">) => void | Promise<void>;
   editing: SymptomEntry | null;
   setEditing: (v: SymptomEntry | null) => void;
-  onUpdate: (id: string, entry: Omit<SymptomEntry, "id" | "logged_at">) => void | Promise<void>;
+  onUpdate: (id: string, entry: Omit<SymptomEntry, "id">) => void | Promise<void>;
 }) {
   const stats = useMemo(() => {
     if (entries.length === 0) return null;
@@ -408,12 +411,17 @@ function NewEntryForm({
 }: {
   initial?: SymptomEntry;
   onClose: () => void;
-  onSave: (entry: Omit<SymptomEntry, "id" | "logged_at">) => void | Promise<void>;
+  onSave: (entry: Omit<SymptomEntry, "id">) => void | Promise<void>;
 }) {
   const [severity, setSeverity] = useState(initial?.severity ?? 3);
   const [selected, setSelected] = useState<string[]>(initial?.symptoms ?? []);
   const [notes, setNotes] = useState(initial?.notes ?? "");
   const [busy, setBusy] = useState(false);
+  const [loggedDate, setLoggedDate] = useState(() => {
+    const d = initial?.logged_at ? new Date(initial.logged_at) : new Date();
+    const off = d.getTimezoneOffset();
+    return new Date(d.getTime() - off * 60_000).toISOString().slice(0, 10);
+  });
 
   const toggle = (id: string) =>
     setSelected((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
@@ -422,7 +430,14 @@ function NewEntryForm({
     e.preventDefault();
     setBusy(true);
     try {
+      // Preserve original time-of-day on edit; default to noon local for new entries.
+      const base = initial?.logged_at ? new Date(initial.logged_at) : new Date();
+      const [y, m, day] = loggedDate.split("-").map(Number);
+      const dt = new Date(base);
+      dt.setFullYear(y, (m ?? 1) - 1, day ?? 1);
+      if (!initial) dt.setHours(12, 0, 0, 0);
       await onSave({
+        logged_at: dt.toISOString(),
         severity,
         symptoms: selected,
         triggers: [],
@@ -435,6 +450,18 @@ function NewEntryForm({
 
   return (
     <form onSubmit={save} className="space-y-3 rounded-2xl border border-border bg-card p-4">
+      <div>
+        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Date
+        </label>
+        <input
+          type="date"
+          value={loggedDate}
+          max={new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 10)}
+          onChange={(e) => setLoggedDate(e.target.value)}
+          className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+        />
+      </div>
       <div>
         <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Severity: {SEVERITY_LABEL[severity]} ({severity}/5)
