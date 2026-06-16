@@ -50,6 +50,7 @@ function SafeRouteScreen() {
   const [routes, setRoutes] = useState<SafeRoute[]>([]);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const { profile, categories, plants } = useAllergies();
 
   const geocode = useServerFn(geocodeAddress);
@@ -69,6 +70,7 @@ function SafeRouteScreen() {
     didAutofillOriginRef.current = true;
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
+        setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
         try {
           const { address, label } = await reverseGeocodeFn({
             data: { lat: pos.coords.latitude, lng: pos.coords.longitude },
@@ -293,6 +295,8 @@ function SafeRouteScreen() {
           polylines={polylines}
           segments={segments}
           hotspots={hotspots}
+          userLocation={userLocation}
+          center={userLocation ?? undefined}
         />
       </div>
 
