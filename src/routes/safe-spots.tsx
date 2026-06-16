@@ -17,7 +17,6 @@ import {
   Loader2,
   ShieldCheck,
   AlertTriangle,
-  X,
   Star,
 } from "lucide-react";
 
@@ -340,17 +339,6 @@ function SafeSpotsScreen() {
                     <SpotDetails
                       spot={s}
                       origin={coords}
-                      isFavorite={isFavorite(s.id)}
-                      onToggleFavorite={() =>
-                        toggleFavorite({
-                          id: s.id,
-                          name: s.name,
-                          lat: s.lat,
-                          lng: s.lng,
-                          category: s.category,
-                          address: s.address,
-                        })
-                      }
                     />
                   )}
                   </div>
@@ -374,13 +362,9 @@ function SafeSpotsScreen() {
 function SpotDetails({
   spot,
   origin,
-  isFavorite,
-  onToggleFavorite,
 }: {
   spot: Spot;
   origin: { lat: number; lng: number } | null;
-  isFavorite: boolean;
-  onToggleFavorite: () => void;
 }) {
   const score =
     spot.pollenMax ?? Math.max(0, ...Object.values(spot.pollen));
