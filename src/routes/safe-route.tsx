@@ -73,7 +73,7 @@ function SafeRouteScreen() {
           const { address, label } = await reverseGeocodeFn({
             data: { lat: pos.coords.latitude, lng: pos.coords.longitude },
           });
-          setOrigin((prev) => (prev ? prev : address || label));
+          setOrigin((prev: string) => (prev ? prev : address || label));
         } catch {
           // ignore — user can type manually
         }
