@@ -104,9 +104,9 @@ function SafeSpotsScreen() {
   const ranked = useMemo(() => {
     if (!query.data) return [];
     const codeMap: Record<string, string> = {
-      TREE: "TREE_UPI",
-      GRASS: "GRASS_UPI",
-      WEED: "WEED_UPI",
+      TREE: "TREE",
+      GRASS: "GRASS",
+      WEED: "WEED",
     };
     const watchCodes =
       allergyCategories.length > 0
@@ -455,12 +455,12 @@ function SpotSheet({
         </div>
 
         <div className="mt-3 grid grid-cols-3 gap-2">
-          {(["TREE_UPI", "GRASS_UPI", "WEED_UPI"] as const).map((code) => {
+          {(["TREE", "GRASS", "WEED"] as const).map((code) => {
             const v = spot.pollen[code] ?? 0;
             const label =
-              code === "TREE_UPI"
+              code === "TREE"
                 ? "Tree"
-                : code === "GRASS_UPI"
+                : code === "GRASS"
                   ? "Grass"
                   : "Weed";
             return (
