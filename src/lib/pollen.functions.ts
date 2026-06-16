@@ -131,7 +131,7 @@ export const reverseGeocode = createServerFn({ method: "POST" })
       locality && region
         ? `${locality}, ${region}`
         : locality || region || json.results[0].formatted_address;
-    return { label };
+    return { label, address: json.results[0].formatted_address };
   });
 
 // Best-effort IP-based location using Cloudflare request headers (set by the
