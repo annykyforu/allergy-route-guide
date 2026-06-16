@@ -32,12 +32,18 @@ export const Route = createFileRoute("/safe-route")({
       },
     ],
   }),
+  validateSearch: (search: Record<string, unknown>) => ({
+    destination:
+      typeof search.destination === "string" ? search.destination : undefined,
+    origin: typeof search.origin === "string" ? search.origin : undefined,
+  }),
   component: SafeRouteScreen,
 });
 
 function SafeRouteScreen() {
-  const [origin, setOrigin] = useState("");
-  const [destination, setDestination] = useState("");
+  const search = Route.useSearch();
+  const [origin, setOrigin] = useState(search.origin ?? "");
+  const [destination, setDestination] = useState(search.destination ?? "");
   const [travelMode, setTravelMode] = useState<
     "WALK" | "BICYCLE" | "TRANSIT" | "DRIVE"
   >("WALK");
