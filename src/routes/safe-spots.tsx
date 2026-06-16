@@ -349,6 +349,7 @@ function SafeSpotsScreen() {
       {selected && (
         <SpotSheet
           spot={selected}
+          origin={coords}
           isFavorite={isFavorite(selected.id)}
           onToggleFavorite={() =>
             toggleFavorite({
@@ -369,11 +370,13 @@ function SafeSpotsScreen() {
 
 function SpotSheet({
   spot,
+  origin,
   isFavorite,
   onToggleFavorite,
   onClose,
 }: {
   spot: Spot;
+  origin: { lat: number; lng: number } | null;
   isFavorite: boolean;
   onToggleFavorite: () => void;
   onClose: () => void;
@@ -383,6 +386,9 @@ function SpotSheet({
   const isSafe = score <= 2;
   const Icon = CATEGORY_META[spot.category].Icon;
   const destinationParam = `${spot.lat.toFixed(6)},${spot.lng.toFixed(6)}`;
+  const originParam = origin
+    ? `${origin.lat.toFixed(6)},${origin.lng.toFixed(6)}`
+    : undefined;
   return (
     <div className="fixed inset-x-0 bottom-16 z-30 px-3">
       <div className="mx-auto max-w-md rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-soft)]">
@@ -483,10 +489,11 @@ function SpotSheet({
 
         <Link
           to="/safe-route"
-          search={{ destination: destinationParam }}
+          search={{ destination: destinationParam, origin: originParam }}
           className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-[image:var(--gradient-warn)] px-3 py-2 text-sm font-semibold text-primary-foreground shadow-sm"
         >
-          <Navigation className="h-4 w-4" /> Directions
+          <Navigation className="h-4 w-4" />
+          {originParam ? "Navigate from my location" : "Directions"}
         </Link>
       </div>
     </div>
