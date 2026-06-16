@@ -2,7 +2,11 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { getSafeOutdoorSpots, type SpotCategory } from "@/lib/pollen.functions";
+import {
+  getSafeOutdoorSpots,
+  getPollenForecast,
+  type SpotCategory,
+} from "@/lib/pollen.functions";
 import { pollenColor, pollenLabel } from "@/lib/google-maps-loader";
 import { useHomeLocation } from "@/hooks/use-home-location";
 import { useAllergies } from "@/hooks/use-allergies";
@@ -373,6 +377,13 @@ function SpotDetails({
   const originParam = origin
     ? `${origin.lat.toFixed(6)},${origin.lng.toFixed(6)}`
     : undefined;
+  const fetchForecast = useServerFn(getPollenForecast);
+  const forecast = useQuery({
+    queryKey: ["spot-forecast", spot.id],
+    queryFn: () =>
+      fetchForecast({ data: { lat: spot.lat, lng: spot.lng, days: 5 } }),
+    staleTime: 30 * 60 * 1000,
+  });
   return (
     <div className="border-t border-border bg-card/60 p-3">
         {spot.address && (
@@ -441,6 +452,63 @@ function SpotDetails({
           <Navigation className="h-4 w-4" />
           {originParam ? "Navigate from my location" : "Directions"}
         </Link>
+
+        <div className="mt-3">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            5-day forecast
+          </p>
+          {forecast.isPending && (
+            <div className="mt-1 flex items-center gap-2 text-[11px] text-muted-foreground">
+              <Loader2 className="h-3 w-3 animate-spin" /> Loading forecast…
+            </div>
+          )}
+          {forecast.isError && (
+            <p className="mt-1 text-[11px] text-destructive">
+              Couldn't load forecast.
+            </p>
+          )}
+          {forecast.data && (
+            <div className="mt-1.5 grid grid-cols-5 gap-1.5">
+              {forecast.data.dailyInfo.slice(0, 5).map((d, i) => {
+                const max = Math.max(
+                  0,
+                  ...d.pollenTypeInfo.map(
+                    (p) => p.indexInfo?.value ?? 0,
+                  ),
+                );
+                const date = new Date(
+                  d.date.year,
+                  d.date.month - 1,
+                  d.date.day,
+                );
+                const dayLabel =
+                  i === 0
+                    ? "Today"
+                    : date.toLocaleDateString(undefined, {
+                        weekday: "short",
+                      });
+                return (
+                  <div
+                    key={i}
+                    className="flex flex-col items-center rounded-lg border border-border bg-background p-1.5"
+                  >
+                    <span className="text-[10px] text-muted-foreground">
+                      {dayLabel}
+                    </span>
+                    <span
+                      aria-hidden
+                      className="my-1 h-2.5 w-2.5 rounded-full"
+                      style={{ background: pollenColor(max) }}
+                    />
+                    <span className="text-[11px] font-semibold text-foreground">
+                      {max}/5
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
     </div>
   );
 }
