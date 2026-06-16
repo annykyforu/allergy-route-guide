@@ -59,7 +59,7 @@ function SafeSpotsScreen() {
   );
   const [locError, setLocError] = useState<string | null>(null);
   const [filters, setFilters] = useState<SpotCategory[]>(["PARK", "SPORTS"]);
-  const [selected, setSelected] = useState<Spot | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   // Use home location if set, otherwise prompt geolocation.
   useEffect(() => {
@@ -245,11 +245,14 @@ function SafeSpotsScreen() {
             {ranked.map((s, idx) => {
               const Icon = CATEGORY_META[s.category].Icon;
               const isSafest = idx === 0 && s.score <= 2;
+              const isOpen = selectedId === s.id;
               return (
                 <li key={s.id}>
+                  <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-[var(--shadow-soft)]">
                   <button
-                    onClick={() => setSelected(s)}
-                    className="group flex w-full items-center gap-3 rounded-2xl border border-border bg-card p-3 text-left shadow-[var(--shadow-soft)] transition-colors hover:bg-accent/30"
+                    onClick={() => setSelectedId(isOpen ? null : s.id)}
+                    aria-expanded={isOpen}
+                    className="group flex w-full items-center gap-3 p-3 text-left transition-colors hover:bg-accent/30"
                   >
                     <span
                       aria-hidden
@@ -333,6 +336,24 @@ function SafeSpotsScreen() {
                       </span>
                     </span>
                   </button>
+                  {isOpen && (
+                    <SpotDetails
+                      spot={s}
+                      origin={coords}
+                      isFavorite={isFavorite(s.id)}
+                      onToggleFavorite={() =>
+                        toggleFavorite({
+                          id: s.id,
+                          name: s.name,
+                          lat: s.lat,
+                          lng: s.lng,
+                          category: s.category,
+                          address: s.address,
+                        })
+                      }
+                    />
+                  )}
+                  </div>
                 </li>
               );
             })}
@@ -346,97 +367,38 @@ function SafeSpotsScreen() {
         </p>
       </main>
 
-      {selected && (
-        <SpotSheet
-          spot={selected}
-          origin={coords}
-          isFavorite={isFavorite(selected.id)}
-          onToggleFavorite={() =>
-            toggleFavorite({
-              id: selected.id,
-              name: selected.name,
-              lat: selected.lat,
-              lng: selected.lng,
-              category: selected.category,
-              address: selected.address,
-            })
-          }
-          onClose={() => setSelected(null)}
-        />
-      )}
     </div>
   );
 }
 
-function SpotSheet({
+function SpotDetails({
   spot,
   origin,
   isFavorite,
   onToggleFavorite,
-  onClose,
 }: {
   spot: Spot;
   origin: { lat: number; lng: number } | null;
   isFavorite: boolean;
   onToggleFavorite: () => void;
-  onClose: () => void;
 }) {
   const score =
     spot.pollenMax ?? Math.max(0, ...Object.values(spot.pollen));
   const isSafe = score <= 2;
-  const Icon = CATEGORY_META[spot.category].Icon;
   const destinationParam = `${spot.lat.toFixed(6)},${spot.lng.toFixed(6)}`;
   const originParam = origin
     ? `${origin.lat.toFixed(6)},${origin.lng.toFixed(6)}`
     : undefined;
   return (
-    <div className="fixed inset-x-0 bottom-16 z-30 px-3">
-      <div className="mx-auto max-w-md rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-soft)]">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0 flex-1">
-            <p className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground">
-              <Icon className="h-3 w-3" /> {CATEGORY_META[spot.category].label}
-            </p>
-            <p className="truncate text-sm font-semibold text-foreground">
-              {spot.name}
-            </p>
-            {spot.address && (
-              <p className="truncate text-[11px] text-muted-foreground">
-                {spot.address}
-              </p>
-            )}
-          </div>
-          <div className="flex shrink-0 items-center gap-1">
-            <button
-              onClick={onToggleFavorite}
-              aria-pressed={isFavorite}
-              aria-label={
-                isFavorite ? "Remove from favorites" : "Save to favorites"
-              }
-              className="rounded-full p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-            >
-              <Star
-                className={
-                  "h-4 w-4 " +
-                  (isFavorite
-                    ? "fill-[color:var(--pollen-3)] text-[color:var(--pollen-3)]"
-                    : "")
-                }
-              />
-            </button>
-            <button
-              onClick={onClose}
-              className="rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-              aria-label="Close"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-
+    <div className="border-t border-border bg-card/60 p-3">
+        {spot.address && (
+          <p className="truncate text-[11px] text-muted-foreground">
+            {spot.address}
+          </p>
+        )}
         <div
           className={
-            "mt-3 flex items-center gap-2 rounded-xl px-3 py-2 text-xs " +
+            "mt-2 flex items-center gap-2 rounded-xl px-3 py-2 text-xs " +
             (isSafe
               ? "bg-[color:var(--pollen-0)]/30 text-foreground"
               : "bg-[color:var(--pollen-4)]/20 text-foreground")
@@ -495,7 +457,6 @@ function SpotSheet({
           <Navigation className="h-4 w-4" />
           {originParam ? "Navigate from my location" : "Directions"}
         </Link>
-      </div>
     </div>
   );
 }
