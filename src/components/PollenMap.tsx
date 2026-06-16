@@ -8,6 +8,8 @@ interface PollenMapProps {
   layer: PollenLayer;
   onMapClick?: (lat: number, lng: number) => void;
   marker?: { lat: number; lng: number } | null;
+  // User's current location — rendered as a distinct blue dot.
+  userLocation?: { lat: number; lng: number } | null;
   polylines?: Array<{
     path: Array<{ lat: number; lng: number }>;
     color: string;
@@ -38,6 +40,7 @@ export function PollenMap({
   layer,
   onMapClick,
   marker,
+  userLocation,
   polylines,
   segments,
   hotspots,
@@ -46,6 +49,9 @@ export function PollenMap({
   const mapRef = useRef<google.maps.Map | null>(null);
   const overlayRef = useRef<google.maps.ImageMapType | null>(null);
   const markerRef = useRef<google.maps.Marker | null>(null);
+  const userMarkerRef = useRef<google.maps.Marker | null>(null);
+  const userAccuracyRef = useRef<google.maps.Circle | null>(null);
+  const didCenterOnUserRef = useRef(false);
   const polylineRefs = useRef<google.maps.Polyline[]>([]);
   const segmentRefs = useRef<google.maps.Polyline[]>([]);
   const hotspotRefs = useRef<google.maps.Marker[]>([]);
@@ -130,6 +136,52 @@ export function PollenMap({
       });
     }
   }, [marker]);
+
+  // User location: render a blue "you are here" dot with a soft halo.
+  // Also pan to it the first time we get a fix, so the map isn't stuck
+  // on the default Vienna center when geolocation arrives after init.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !window.google) return;
+    if (userMarkerRef.current) {
+      userMarkerRef.current.setMap(null);
+      userMarkerRef.current = null;
+    }
+    if (userAccuracyRef.current) {
+      userAccuracyRef.current.setMap(null);
+      userAccuracyRef.current = null;
+    }
+    if (!userLocation) return;
+    userAccuracyRef.current = new google.maps.Circle({
+      map,
+      center: userLocation,
+      radius: 60,
+      strokeColor: "#1D4ED8",
+      strokeOpacity: 0.35,
+      strokeWeight: 1,
+      fillColor: "#3B82F6",
+      fillOpacity: 0.18,
+      clickable: false,
+    });
+    userMarkerRef.current = new google.maps.Marker({
+      position: userLocation,
+      map,
+      zIndex: 1000,
+      icon: {
+        path: google.maps.SymbolPath.CIRCLE,
+        scale: 7,
+        fillColor: "#1D4ED8",
+        fillOpacity: 1,
+        strokeColor: "#fff",
+        strokeWeight: 3,
+      },
+      title: "Your location",
+    });
+    if (!didCenterOnUserRef.current) {
+      map.panTo(userLocation);
+      didCenterOnUserRef.current = true;
+    }
+  }, [userLocation]);
 
   // Polylines
   useEffect(() => {

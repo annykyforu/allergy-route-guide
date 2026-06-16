@@ -191,6 +191,7 @@ function MapScreen() {
           center={center}
           onMapClick={handleClick}
           marker={marker}
+          userLocation={center}
           hotspots={hotspots}
         />
       </div>
