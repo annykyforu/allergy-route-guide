@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { PollenMap } from "@/components/PollenMap";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 import { RouteExposureTimeline } from "@/components/RouteExposureTimeline";
@@ -11,7 +11,7 @@ import {
   type SafeRoute,
   type PollenSample,
 } from "@/lib/safe-route.functions";
-import { geocodeAddress } from "@/lib/pollen.functions";
+import { geocodeAddress, reverseGeocode } from "@/lib/pollen.functions";
 import { pollenColor, pollenHex, pollenLabel } from "@/lib/google-maps-loader";
 import { useAllergies } from "@/hooks/use-allergies";
 import { Shield, AlertTriangle, Loader2, Footprints, Bike, Bus, Car, Settings as SettingsIcon } from "lucide-react";
@@ -55,6 +55,36 @@ function SafeRouteScreen() {
   const geocode = useServerFn(geocodeAddress);
   const compute = useServerFn(findSafeRoutes);
   const exposureFn = useServerFn(getRouteExposureForecast);
+  const reverseGeocodeFn = useServerFn(reverseGeocode);
+
+  // Default the "From" field to the user's current location (once).
+  const didAutofillOriginRef = useRef(false);
+  useEffect(() => {
+    if (didAutofillOriginRef.current) return;
+    if (origin) {
+      didAutofillOriginRef.current = true;
+      return;
+    }
+    if (typeof navigator === "undefined" || !navigator.geolocation) return;
+    didAutofillOriginRef.current = true;
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const { address, label } = await reverseGeocodeFn({
+            data: { lat: pos.coords.latitude, lng: pos.coords.longitude },
+          });
+          setOrigin((prev: string) => (prev ? prev : address || label));
+        } catch {
+          // ignore — user can type manually
+        }
+      },
+      () => {
+        // permission denied or unavailable — leave field empty
+      },
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 5 * 60 * 1000 },
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const mutation = useMutation({
     mutationFn: async () => {
