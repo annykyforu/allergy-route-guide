@@ -5,6 +5,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { PollenMap } from "@/components/PollenMap";
 import { PollenBadge, PollenScale } from "@/components/PollenLevel";
 import { SpikeAlert } from "@/components/SpikeAlert";
+import { FavoriteSpotsAlert } from "@/components/FavoriteSpotsAlert";
 import {
   getPollenForecast,
   getNearbyGreenAreas,
@@ -177,8 +178,9 @@ function MapScreen() {
           )}
         </div>
         {/* Spike alert for saved home location */}
-        <div className="mt-2">
+        <div className="mt-2 space-y-2">
           <SpikeAlert />
+          <FavoriteSpotsAlert />
         </div>
       </header>
 

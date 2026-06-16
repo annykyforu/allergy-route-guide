@@ -6,6 +6,8 @@ import { getSafeOutdoorSpots, type SpotCategory } from "@/lib/pollen.functions";
 import { pollenColor, pollenLabel } from "@/lib/google-maps-loader";
 import { useHomeLocation } from "@/hooks/use-home-location";
 import { useAllergies } from "@/hooks/use-allergies";
+import { useFavoriteSpots } from "@/hooks/use-favorite-spots";
+import { FavoriteSpotsAlert } from "@/components/FavoriteSpotsAlert";
 import {
   Trees,
   Dumbbell,
@@ -15,6 +17,7 @@ import {
   ShieldCheck,
   AlertTriangle,
   X,
+  Star,
 } from "lucide-react";
 
 export const Route = createFileRoute("/safe-spots")({
@@ -49,6 +52,7 @@ const CATEGORY_META: Record<
 function SafeSpotsScreen() {
   const { home } = useHomeLocation();
   const { categories: allergyCategories } = useAllergies();
+  const { favorites, isFavorite, toggle: toggleFavorite } = useFavoriteSpots();
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(
     null,
   );
@@ -173,6 +177,12 @@ function SafeSpotsScreen() {
       </header>
 
       <main className="mt-3 flex-1 px-4">
+        {favorites.length > 0 && (
+          <div className="mb-3 space-y-2">
+            <FavoriteSpotsAlert />
+          </div>
+        )}
+
         {locError && !coords && (
           <div className="rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground">
             {locError}
@@ -238,7 +248,53 @@ function SafeSpotsScreen() {
                         {s.distanceKm.toFixed(1)} km away
                       </span>
                     </span>
-                    <span className="shrink-0 text-right">
+                    <span className="flex shrink-0 items-center gap-2">
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        aria-label={
+                          isFavorite(s.id)
+                            ? "Remove from favorites"
+                            : "Save to favorites"
+                        }
+                        aria-pressed={isFavorite(s.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleFavorite({
+                            id: s.id,
+                            name: s.name,
+                            lat: s.lat,
+                            lng: s.lng,
+                            category: s.category,
+                            address: s.address,
+                          });
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            toggleFavorite({
+                              id: s.id,
+                              name: s.name,
+                              lat: s.lat,
+                              lng: s.lng,
+                              category: s.category,
+                              address: s.address,
+                            });
+                          }
+                        }}
+                        className="rounded-full p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                      >
+                        <Star
+                          className={
+                            "h-4 w-4 " +
+                            (isFavorite(s.id)
+                              ? "fill-[color:var(--pollen-3)] text-[color:var(--pollen-3)]"
+                              : "")
+                          }
+                        />
+                      </span>
+                      <span className="text-right">
                       <span className="block text-[10px] uppercase tracking-wide text-muted-foreground">
                         Pollen
                       </span>
@@ -247,6 +303,7 @@ function SafeSpotsScreen() {
                       </span>
                       <span className="block text-[10px] text-muted-foreground">
                         {pollenLabel(s.score)}
+                      </span>
                       </span>
                     </span>
                   </button>
@@ -264,13 +321,37 @@ function SafeSpotsScreen() {
       </main>
 
       {selected && (
-        <SpotSheet spot={selected} onClose={() => setSelected(null)} />
+        <SpotSheet
+          spot={selected}
+          isFavorite={isFavorite(selected.id)}
+          onToggleFavorite={() =>
+            toggleFavorite({
+              id: selected.id,
+              name: selected.name,
+              lat: selected.lat,
+              lng: selected.lng,
+              category: selected.category,
+              address: selected.address,
+            })
+          }
+          onClose={() => setSelected(null)}
+        />
       )}
     </div>
   );
 }
 
-function SpotSheet({ spot, onClose }: { spot: Spot; onClose: () => void }) {
+function SpotSheet({
+  spot,
+  isFavorite,
+  onToggleFavorite,
+  onClose,
+}: {
+  spot: Spot;
+  isFavorite: boolean;
+  onToggleFavorite: () => void;
+  onClose: () => void;
+}) {
   const score =
     spot.pollenMax ?? Math.max(0, ...Object.values(spot.pollen));
   const isSafe = score <= 2;
@@ -293,13 +374,32 @@ function SpotSheet({ spot, onClose }: { spot: Spot; onClose: () => void }) {
               </p>
             )}
           </div>
-          <button
-            onClick={onClose}
-            className="rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-            aria-label="Close"
-          >
-            <X className="h-4 w-4" />
-          </button>
+          <div className="flex shrink-0 items-center gap-1">
+            <button
+              onClick={onToggleFavorite}
+              aria-pressed={isFavorite}
+              aria-label={
+                isFavorite ? "Remove from favorites" : "Save to favorites"
+              }
+              className="rounded-full p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              <Star
+                className={
+                  "h-4 w-4 " +
+                  (isFavorite
+                    ? "fill-[color:var(--pollen-3)] text-[color:var(--pollen-3)]"
+                    : "")
+                }
+              />
+            </button>
+            <button
+              onClick={onClose}
+              className="rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+              aria-label="Close"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </div>
 
         <div
