@@ -8,6 +8,7 @@ import { useHomeLocation } from "@/hooks/use-home-location";
 import { useAllergies } from "@/hooks/use-allergies";
 import { useFavoriteSpots } from "@/hooks/use-favorite-spots";
 import { FavoriteSpotsAlert } from "@/components/FavoriteSpotsAlert";
+import { PollenMap } from "@/components/PollenMap";
 import {
   Trees,
   Dumbbell,
@@ -132,6 +133,19 @@ function SafeSpotsScreen() {
       prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c],
     );
 
+  // Build map markers from ranked spots, color-coded by pollen score.
+  const spotHotspots = useMemo(
+    () =>
+      ranked.map((s) => ({
+        lat: s.lat,
+        lng: s.lng,
+        color: pollenColor(s.score),
+        title: s.name,
+        breakdown: `<div><strong>${CATEGORY_META[s.category].label}</strong> · ${s.distanceKm.toFixed(1)} km</div><div style="margin-top:4px">Pollen <strong>${s.score}/5</strong> · ${pollenLabel(s.score)}</div>`,
+      })),
+    [ranked],
+  );
+
   return (
     <div className="flex min-h-0 w-full flex-1 flex-col bg-background pb-20">
       <header className="px-4 pt-[max(0.75rem,env(safe-area-inset-top))]">
@@ -177,6 +191,18 @@ function SafeSpotsScreen() {
       </header>
 
       <main className="mt-3 flex-1 px-4">
+        {coords && (
+          <div className="mb-3 h-56 overflow-hidden rounded-2xl border border-border shadow-[var(--shadow-soft)]">
+            <PollenMap
+              layer="NONE"
+              center={coords}
+              zoom={14}
+              userLocation={coords}
+              hotspots={spotHotspots}
+            />
+          </div>
+        )}
+
         {favorites.length > 0 && (
           <div className="mb-3 space-y-2">
             <FavoriteSpotsAlert />
