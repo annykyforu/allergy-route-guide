@@ -57,6 +57,7 @@ export function PollenMap({
   const hotspotRefs = useRef<google.maps.Marker[]>([]);
   const infoRef = useRef<google.maps.InfoWindow | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [mapReady, setMapReady] = useState(false);
 
   // Init map
   useEffect(() => {
@@ -76,6 +77,7 @@ export function PollenMap({
           ],
         });
         mapRef.current = map;
+        setMapReady(true);
         if (onMapClick) {
           map.addListener("click", (e: google.maps.MapMouseEvent) => {
             if (e.latLng) onMapClick(e.latLng.lat(), e.latLng.lng());
@@ -111,7 +113,7 @@ export function PollenMap({
       overlayRef.current = overlay;
       map.overlayMapTypes.push(overlay);
     }
-  }, [layer]);
+  }, [layer, mapReady]);
 
   // Marker
   useEffect(() => {
@@ -135,7 +137,7 @@ export function PollenMap({
         },
       });
     }
-  }, [marker]);
+  }, [marker, mapReady]);
 
   // User location: render a blue "you are here" dot with a soft halo.
   // Also pan to it the first time we get a fix, so the map isn't stuck
@@ -181,7 +183,7 @@ export function PollenMap({
       map.panTo(userLocation);
       didCenterOnUserRef.current = true;
     }
-  }, [userLocation]);
+  }, [userLocation, mapReady]);
 
   // Polylines
   useEffect(() => {
@@ -200,7 +202,7 @@ export function PollenMap({
       });
       polylineRefs.current.push(line);
     });
-  }, [polylines]);
+  }, [polylines, mapReady]);
 
   // Multi-colored segments
   useEffect(() => {
@@ -219,7 +221,7 @@ export function PollenMap({
       });
       segmentRefs.current.push(line);
     });
-  }, [segments]);
+  }, [segments, mapReady]);
 
   // Fit bounds whenever polylines/segments change.
   useEffect(() => {
@@ -232,7 +234,7 @@ export function PollenMap({
       bounds.extend(s.to);
     });
     if (!bounds.isEmpty()) map.fitBounds(bounds, 60);
-  }, [polylines, segments]);
+  }, [polylines, segments, mapReady]);
 
   // Hotspot markers
   useEffect(() => {
@@ -269,7 +271,7 @@ export function PollenMap({
       });
       hotspotRefs.current.push(m);
     });
-  }, [hotspots]);
+  }, [hotspots, mapReady]);
 
   if (error) {
     return (
