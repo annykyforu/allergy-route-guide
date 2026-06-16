@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
@@ -356,7 +356,7 @@ function SpotSheet({
     spot.pollenMax ?? Math.max(0, ...Object.values(spot.pollen));
   const isSafe = score <= 2;
   const Icon = CATEGORY_META[spot.category].Icon;
-  const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${spot.lat},${spot.lng}`;
+  const destinationParam = `${spot.lat.toFixed(6)},${spot.lng.toFixed(6)}`;
   return (
     <div className="fixed inset-x-0 bottom-16 z-30 px-3">
       <div className="mx-auto max-w-md rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-soft)]">
@@ -455,14 +455,13 @@ function SpotSheet({
           })}
         </div>
 
-        <a
-          href={directionsUrl}
-          target="_blank"
-          rel="noreferrer"
+        <Link
+          to="/safe-route"
+          search={{ destination: destinationParam }}
           className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-[image:var(--gradient-warn)] px-3 py-2 text-sm font-semibold text-primary-foreground shadow-sm"
         >
           <Navigation className="h-4 w-4" /> Directions
-        </a>
+        </Link>
       </div>
     </div>
   );
