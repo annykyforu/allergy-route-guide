@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SymptomsRouteImport } from './routes/symptoms'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as SafeSpotsRouteImport } from './routes/safe-spots'
 import { Route as SafeRouteRouteImport } from './routes/safe-route'
 import { Route as ForecastRouteImport } from './routes/forecast'
 import { Route as AuthRouteImport } from './routes/auth'
@@ -25,6 +26,11 @@ const SymptomsRoute = SymptomsRouteImport.update({
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SafeSpotsRoute = SafeSpotsRouteImport.update({
+  id: '/safe-spots',
+  path: '/safe-spots',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SafeRouteRoute = SafeRouteRouteImport.update({
@@ -58,6 +64,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/forecast': typeof ForecastRoute
   '/safe-route': typeof SafeRouteRoute
+  '/safe-spots': typeof SafeSpotsRoute
   '/settings': typeof SettingsRoute
   '/symptoms': typeof SymptomsRoute
   '/api/pollen-tile/$': typeof ApiPollenTileSplatRoute
@@ -67,6 +74,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/forecast': typeof ForecastRoute
   '/safe-route': typeof SafeRouteRoute
+  '/safe-spots': typeof SafeSpotsRoute
   '/settings': typeof SettingsRoute
   '/symptoms': typeof SymptomsRoute
   '/api/pollen-tile/$': typeof ApiPollenTileSplatRoute
@@ -77,6 +85,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/forecast': typeof ForecastRoute
   '/safe-route': typeof SafeRouteRoute
+  '/safe-spots': typeof SafeSpotsRoute
   '/settings': typeof SettingsRoute
   '/symptoms': typeof SymptomsRoute
   '/api/pollen-tile/$': typeof ApiPollenTileSplatRoute
@@ -88,6 +97,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/forecast'
     | '/safe-route'
+    | '/safe-spots'
     | '/settings'
     | '/symptoms'
     | '/api/pollen-tile/$'
@@ -97,6 +107,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/forecast'
     | '/safe-route'
+    | '/safe-spots'
     | '/settings'
     | '/symptoms'
     | '/api/pollen-tile/$'
@@ -106,6 +117,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/forecast'
     | '/safe-route'
+    | '/safe-spots'
     | '/settings'
     | '/symptoms'
     | '/api/pollen-tile/$'
@@ -116,6 +128,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   ForecastRoute: typeof ForecastRoute
   SafeRouteRoute: typeof SafeRouteRoute
+  SafeSpotsRoute: typeof SafeSpotsRoute
   SettingsRoute: typeof SettingsRoute
   SymptomsRoute: typeof SymptomsRoute
   ApiPollenTileSplatRoute: typeof ApiPollenTileSplatRoute
@@ -135,6 +148,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/safe-spots': {
+      id: '/safe-spots'
+      path: '/safe-spots'
+      fullPath: '/safe-spots'
+      preLoaderRoute: typeof SafeSpotsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/safe-route': {
@@ -180,6 +200,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   ForecastRoute: ForecastRoute,
   SafeRouteRoute: SafeRouteRoute,
+  SafeSpotsRoute: SafeSpotsRoute,
   SettingsRoute: SettingsRoute,
   SymptomsRoute: SymptomsRoute,
   ApiPollenTileSplatRoute: ApiPollenTileSplatRoute,
@@ -187,13 +208,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

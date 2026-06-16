@@ -205,3 +205,142 @@ export const getNearbyGreenAreas = createServerFn({ method: "POST" })
         lng: p.location!.longitude,
       }));
   });
+
+// Find nearby outdoor places suitable for exercise (parks + sports venues),
+// then look up today's pollen index for each so users can pick a safer spot
+// for an outdoor workout.
+export type SpotCategory = "PARK" | "SPORTS";
+
+const PARK_TYPES = ["park", "garden", "national_park"] as const;
+const SPORTS_TYPES = [
+  "stadium",
+  "sports_complex",
+  "athletic_field",
+  "sports_club",
+  "fitness_center",
+] as const;
+
+function categorize(types: string[] | undefined): SpotCategory {
+  if (!types) return "PARK";
+  if (types.some((t) => (SPORTS_TYPES as readonly string[]).includes(t)))
+    return "SPORTS";
+  return "PARK";
+}
+
+function haversineKm(
+  a: { lat: number; lng: number },
+  b: { lat: number; lng: number },
+) {
+  const R = 6371;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const s =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(s));
+}
+
+async function fetchTodayMax(lat: number, lng: number): Promise<{
+  byType: Record<string, number>;
+  max: number;
+} | null> {
+  const params = new URLSearchParams({
+    "location.latitude": String(lat),
+    "location.longitude": String(lng),
+    days: "1",
+  });
+  const res = await fetch(
+    `${GATEWAY_URL}/pollen/v1/forecast:lookup?${params.toString()}`,
+    { headers: headers() },
+  );
+  if (!res.ok) return null;
+  const json = (await res.json()) as PollenForecast;
+  const today = json.dailyInfo?.[0];
+  if (!today) return null;
+  const byType: Record<string, number> = {};
+  for (const t of today.pollenTypeInfo) {
+    byType[t.code] = t.indexInfo?.value ?? 0;
+  }
+  const max = Math.max(0, ...Object.values(byType));
+  return { byType, max };
+}
+
+export const getSafeOutdoorSpots = createServerFn({ method: "POST" })
+  .inputValidator(
+    z.object({
+      lat: z.number().min(-90).max(90),
+      lng: z.number().min(-180).max(180),
+      radius: z.number().min(200).max(10000).default(3000),
+      categories: z
+        .array(z.enum(["PARK", "SPORTS"]))
+        .default(["PARK", "SPORTS"]),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const includedTypes = [
+      ...(data.categories.includes("PARK") ? PARK_TYPES : []),
+      ...(data.categories.includes("SPORTS") ? SPORTS_TYPES : []),
+    ];
+    if (includedTypes.length === 0) return [];
+
+    const placesRes = await fetch(`${GATEWAY_URL}/places/v1/places:searchNearby`, {
+      method: "POST",
+      headers: {
+        ...headers(),
+        "X-Goog-FieldMask":
+          "places.id,places.displayName,places.location,places.types,places.formattedAddress",
+      },
+      body: JSON.stringify({
+        includedTypes,
+        maxResultCount: 20,
+        locationRestriction: {
+          circle: {
+            center: { latitude: data.lat, longitude: data.lng },
+            radius: data.radius,
+          },
+        },
+      }),
+    });
+    if (!placesRes.ok) {
+      const body = await placesRes.text();
+      throw new Error(`Places API ${placesRes.status}: ${body.slice(0, 200)}`);
+    }
+    const placesJson = (await placesRes.json()) as {
+      places?: Array<{
+        id: string;
+        displayName?: { text: string };
+        formattedAddress?: string;
+        location?: { latitude: number; longitude: number };
+        types?: string[];
+      }>;
+    };
+    const spots = (placesJson.places ?? [])
+      .filter((p) => p.location)
+      .slice(0, 12)
+      .map((p) => ({
+        id: p.id,
+        name: p.displayName?.text ?? "Outdoor spot",
+        address: p.formattedAddress,
+        lat: p.location!.latitude,
+        lng: p.location!.longitude,
+        category: categorize(p.types),
+        distanceKm: haversineKm(
+          { lat: data.lat, lng: data.lng },
+          { lat: p.location!.latitude, lng: p.location!.longitude },
+        ),
+      }));
+
+    // Fetch today's pollen for each spot in parallel.
+    const enriched = await Promise.all(
+      spots.map(async (s) => {
+        const pollen = await fetchTodayMax(s.lat, s.lng);
+        return {
+          ...s,
+          pollen: pollen?.byType ?? {},
+          pollenMax: pollen?.max ?? null,
+        };
+      }),
+    );
+    return enriched;
+  });
