@@ -14,7 +14,7 @@ import {
 import { geocodeAddress, reverseGeocode } from "@/lib/pollen.functions";
 import { pollenColor, pollenHex, pollenLabel } from "@/lib/google-maps-loader";
 import { useAllergies } from "@/hooks/use-allergies";
-import { Shield, AlertTriangle, Loader2, Footprints, Bike, Bus, Car, Settings as SettingsIcon } from "lucide-react";
+import { Shield, AlertTriangle, Loader2, Footprints, Bike, Bus, Car, Settings as SettingsIcon, Navigation } from "lucide-react";
 
 export const Route = createFileRoute("/safe-route")({
   head: () => ({
@@ -328,6 +328,20 @@ function SafeRouteScreen() {
         </div>
       )}
 
+      {selectedRoute && origin && destination && (
+        <div className="mt-3 mx-4">
+          <a
+            href={buildNavigationUrl(origin, destination, travelMode)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-soft)] transition-opacity hover:opacity-90"
+          >
+            <Navigation className="h-4 w-4" />
+            Start navigation
+          </a>
+        </div>
+      )}
+
       {routes.length > 0 && (
         <ul className="mt-4 max-h-[40vh] space-y-2 overflow-y-auto px-4 pb-4">
           {routes.map((r) => (
@@ -442,4 +456,27 @@ function prettify(code: string): string {
     .split("_")
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(" ");
+}
+
+function buildNavigationUrl(
+  origin: string,
+  destination: string,
+  mode: "WALK" | "BICYCLE" | "TRANSIT" | "DRIVE",
+): string {
+  const gmapsMode =
+    mode === "WALK"
+      ? "walking"
+      : mode === "BICYCLE"
+        ? "bicycling"
+        : mode === "TRANSIT"
+          ? "transit"
+          : "driving";
+  const params = new URLSearchParams({
+    api: "1",
+    origin,
+    destination,
+    travelmode: gmapsMode,
+    dir_action: "navigate",
+  });
+  return `https://www.google.com/maps/dir/?${params.toString()}`;
 }
