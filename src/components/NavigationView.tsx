@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { loadGoogleMaps } from "@/lib/google-maps-loader";
+import { pollenHex } from "@/lib/google-maps-loader";
 import {
   getNavigationRoute,
   type NavigationStep,
@@ -24,6 +25,9 @@ interface NavigationViewProps {
   destination: { lat: number; lng: number };
   travelMode: "WALK" | "BICYCLE" | "TRANSIT" | "DRIVE";
   destinationLabel?: string;
+  // Optional pollen-exposure samples along the route; when provided, the
+  // route polyline is colored by the nearest sample's personalized score.
+  exposureSamples?: Array<{ lat: number; lng: number; personalized: number }>;
   onClose: () => void;
 }
 
@@ -78,11 +82,12 @@ export function NavigationView({
   destination,
   travelMode,
   destinationLabel,
+  exposureSamples,
   onClose,
 }: NavigationViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
-  const routeLineRef = useRef<google.maps.Polyline | null>(null);
+  const routeLinesRef = useRef<google.maps.Polyline[]>([]);
   const userMarkerRef = useRef<google.maps.Marker | null>(null);
   const destMarkerRef = useRef<google.maps.Marker | null>(null);
   const [mapReady, setMapReady] = useState(false);
@@ -151,7 +156,8 @@ export function NavigationView({
       });
     return () => {
       cancelled = true;
-      routeLineRef.current?.setMap(null);
+      routeLinesRef.current.forEach((l) => l.setMap(null));
+      routeLinesRef.current = [];
       userMarkerRef.current?.setMap(null);
       destMarkerRef.current?.setMap(null);
       mapRef.current = null;
@@ -159,19 +165,64 @@ export function NavigationView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Draw the route polyline once route + map ready.
+  // Draw the route polyline once route + map ready. If exposure samples are
+  // provided, color each sub-segment by the nearest sample's pollen value;
+  // otherwise fall back to a single blue line.
   useEffect(() => {
     if (!mapReady || !route || !mapRef.current) return;
-    routeLineRef.current?.setMap(null);
-    const line = new google.maps.Polyline({
-      path: route.polyline,
-      strokeColor: "#2563EB",
-      strokeOpacity: 0.9,
-      strokeWeight: 6,
-      map: mapRef.current,
+    routeLinesRef.current.forEach((l) => l.setMap(null));
+    routeLinesRef.current = [];
+    const path = route.polyline;
+    if (path.length < 2) return;
+
+    if (!exposureSamples || exposureSamples.length === 0) {
+      const line = new google.maps.Polyline({
+        path,
+        strokeColor: "#2563EB",
+        strokeOpacity: 0.9,
+        strokeWeight: 6,
+        map: mapRef.current,
+      });
+      routeLinesRef.current = [line];
+      return;
+    }
+
+    // For each polyline point, find the nearest exposure sample and use its
+    // personalized score for the color. Then merge consecutive same-color
+    // segments into a single polyline for efficiency.
+    const pointColors = path.map((p) => {
+      let best = Infinity;
+      let bestVal = 0;
+      for (const s of exposureSamples) {
+        const d = haversine(p, s);
+        if (d < best) {
+          best = d;
+          bestVal = s.personalized;
+        }
+      }
+      return pollenHex(bestVal);
     });
-    routeLineRef.current = line;
-  }, [mapReady, route]);
+
+    let segStart = 0;
+    for (let i = 1; i <= path.length; i++) {
+      const atEnd = i === path.length;
+      const colorChanged = !atEnd && pointColors[i] !== pointColors[segStart];
+      if (atEnd || colorChanged) {
+        const segPath = path.slice(segStart, i + (atEnd ? 0 : 1));
+        if (segPath.length >= 2) {
+          const line = new google.maps.Polyline({
+            path: segPath,
+            strokeColor: pointColors[segStart],
+            strokeOpacity: 0.95,
+            strokeWeight: 7,
+            map: mapRef.current!,
+          });
+          routeLinesRef.current.push(line);
+        }
+        segStart = i;
+      }
+    }
+  }, [mapReady, route, exposureSamples]);
 
   // Watch user geolocation.
   useEffect(() => {
