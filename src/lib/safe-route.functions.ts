@@ -219,6 +219,123 @@ export interface SafeRoute {
   safest: boolean;
 }
 
+export interface NavigationStep {
+  instruction: string;
+  maneuver: string | null;
+  distanceMeters: number;
+  endLocation: { lat: number; lng: number };
+  polyline: Array<{ lat: number; lng: number }>;
+}
+
+export interface NavigationRoute {
+  distanceMeters: number;
+  durationSeconds: number;
+  polyline: Array<{ lat: number; lng: number }>;
+  steps: NavigationStep[];
+}
+
+export const getNavigationRoute = createServerFn({ method: "POST" })
+  .inputValidator(
+    z.object({
+      origin: z.object({ lat: z.number(), lng: z.number() }),
+      destination: z.object({ lat: z.number(), lng: z.number() }),
+      travelMode: z
+        .enum(["WALK", "BICYCLE", "DRIVE", "TRANSIT"])
+        .default("WALK"),
+    }),
+  )
+  .handler(async ({ data }): Promise<NavigationRoute> => {
+    const body = {
+      origin: {
+        location: {
+          latLng: { latitude: data.origin.lat, longitude: data.origin.lng },
+        },
+      },
+      destination: {
+        location: {
+          latLng: {
+            latitude: data.destination.lat,
+            longitude: data.destination.lng,
+          },
+        },
+      },
+      travelMode: data.travelMode,
+      computeAlternativeRoutes: false,
+      polylineQuality: "HIGH_QUALITY",
+      languageCode: "en-US",
+      units: "METRIC",
+    };
+    const res = await fetch(
+      `${GATEWAY_URL}/routes/directions/v2:computeRoutes`,
+      {
+        method: "POST",
+        headers: headers({
+          "X-Goog-FieldMask": [
+            "routes.distanceMeters",
+            "routes.duration",
+            "routes.polyline.encodedPolyline",
+            "routes.legs.steps.navigationInstruction.instructions",
+            "routes.legs.steps.navigationInstruction.maneuver",
+            "routes.legs.steps.distanceMeters",
+            "routes.legs.steps.polyline.encodedPolyline",
+            "routes.legs.steps.endLocation.latLng",
+          ].join(","),
+        }),
+        body: JSON.stringify(body),
+      },
+    );
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Routes API ${res.status}: ${text.slice(0, 200)}`);
+    }
+    const json = (await res.json()) as {
+      routes?: Array<{
+        distanceMeters?: number;
+        duration?: string;
+        polyline?: { encodedPolyline?: string };
+        legs?: Array<{
+          steps?: Array<{
+            navigationInstruction?: {
+              instructions?: string;
+              maneuver?: string;
+            };
+            distanceMeters?: number;
+            polyline?: { encodedPolyline?: string };
+            endLocation?: { latLng?: { latitude?: number; longitude?: number } };
+          }>;
+        }>;
+      }>;
+    };
+    const r = json.routes?.[0];
+    if (!r) throw new Error("No route found");
+    const polyline = r.polyline?.encodedPolyline
+      ? decodePolyline(r.polyline.encodedPolyline)
+      : [];
+    const steps: NavigationStep[] = [];
+    for (const leg of r.legs ?? []) {
+      for (const s of leg.steps ?? []) {
+        const end = s.endLocation?.latLng;
+        if (!end || end.latitude == null || end.longitude == null) continue;
+        steps.push({
+          instruction:
+            s.navigationInstruction?.instructions?.trim() || "Continue",
+          maneuver: s.navigationInstruction?.maneuver ?? null,
+          distanceMeters: s.distanceMeters ?? 0,
+          endLocation: { lat: end.latitude, lng: end.longitude },
+          polyline: s.polyline?.encodedPolyline
+            ? decodePolyline(s.polyline.encodedPolyline)
+            : [],
+        });
+      }
+    }
+    return {
+      distanceMeters: r.distanceMeters ?? 0,
+      durationSeconds: parseInt((r.duration ?? "0s").replace("s", ""), 10),
+      polyline,
+      steps,
+    };
+  });
+
 const profileSchema = z.object({
   categories: z.array(z.enum(["TREE", "GRASS", "WEED"])).default([]),
   plants: z.array(z.string().max(40)).default([]),

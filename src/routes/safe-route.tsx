@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { PollenMap } from "@/components/PollenMap";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 import { RouteExposureTimeline } from "@/components/RouteExposureTimeline";
+import { NavigationView } from "@/components/NavigationView";
 import {
   findSafeRoutes,
   getRouteExposureForecast,
@@ -51,6 +52,11 @@ function SafeRouteScreen() {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [navOpen, setNavOpen] = useState(false);
+  const [navEndpoints, setNavEndpoints] = useState<{
+    origin: { lat: number; lng: number };
+    destination: { lat: number; lng: number };
+  } | null>(null);
   const { profile, categories, plants } = useAllergies();
 
   const geocode = useServerFn(geocodeAddress);
@@ -107,6 +113,10 @@ function SafeRouteScreen() {
       setRoutes(result.routes);
       const safest = result.routes.find((r) => r.safest) ?? result.routes[0];
       if (safest) setSelectedIndex(safest.index);
+      setNavEndpoints({
+        origin: { lat: a.lat, lng: a.lng },
+        destination: { lat: b.lat, lng: b.lng },
+      });
       return result;
     },
     onError: (e: Error) => setError(e.message),
@@ -328,17 +338,16 @@ function SafeRouteScreen() {
         </div>
       )}
 
-      {selectedRoute && origin && destination && (
+      {selectedRoute && navEndpoints && (
         <div className="mt-3 mx-4">
-          <a
-            href={buildNavigationUrl(origin, destination, travelMode)}
-            target="_blank"
-            rel="noopener noreferrer"
+          <button
+            type="button"
+            onClick={() => setNavOpen(true)}
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-soft)] transition-opacity hover:opacity-90"
           >
             <Navigation className="h-4 w-4" />
             Start navigation
-          </a>
+          </button>
         </div>
       )}
 
@@ -427,6 +436,16 @@ function SafeRouteScreen() {
           ))}
         </ul>
       )}
+
+      {navOpen && navEndpoints && (
+        <NavigationView
+          origin={navEndpoints.origin}
+          destination={navEndpoints.destination}
+          travelMode={travelMode}
+          destinationLabel={destination}
+          onClose={() => setNavOpen(false)}
+        />
+      )}
     </div>
   );
 }
@@ -456,27 +475,4 @@ function prettify(code: string): string {
     .split("_")
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(" ");
-}
-
-function buildNavigationUrl(
-  origin: string,
-  destination: string,
-  mode: "WALK" | "BICYCLE" | "TRANSIT" | "DRIVE",
-): string {
-  const gmapsMode =
-    mode === "WALK"
-      ? "walking"
-      : mode === "BICYCLE"
-        ? "bicycling"
-        : mode === "TRANSIT"
-          ? "transit"
-          : "driving";
-  const params = new URLSearchParams({
-    api: "1",
-    origin,
-    destination,
-    travelmode: gmapsMode,
-    dir_action: "navigate",
-  });
-  return `https://www.google.com/maps/dir/?${params.toString()}`;
 }
