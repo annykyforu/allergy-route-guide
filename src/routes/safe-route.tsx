@@ -443,6 +443,11 @@ function SafeRouteScreen() {
           destination={navEndpoints.destination}
           travelMode={travelMode}
           destinationLabel={destination}
+          exposureSamples={selectedRoute?.samples.map((s) => ({
+            lat: s.lat,
+            lng: s.lng,
+            personalized: s.personalized,
+          }))}
           onClose={() => setNavOpen(false)}
         />
       )}
