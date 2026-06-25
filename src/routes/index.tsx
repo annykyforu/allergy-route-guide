@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { PollenMap } from "@/components/PollenMap";
 import { PollenBadge, PollenScale } from "@/components/PollenLevel";
+import { PollenIndexInfo } from "@/components/PollenIndexInfo";
 import { SpikeAlert } from "@/components/SpikeAlert";
 import { FavoriteSpotsAlert } from "@/components/FavoriteSpotsAlert";
 import {
@@ -201,6 +202,7 @@ function MapScreen() {
         <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
           Pollen index
         </span>
+        <PollenIndexInfo />
         <PollenScale />
       </div>
 
